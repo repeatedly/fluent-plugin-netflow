@@ -70,18 +70,20 @@ module Fluent
     protected
 
     def receive_data(host, data)
+      log.debug "received logs", :host => host, :data => data
+
       @parser.call(data) { |time, record|
         unless time && record
-          log.warn "pattern not match: #{text.inspect}"
+          log.warn "pattern not match: #{data.inspect}"
           return
         end
 
         record['host'] = host
-        Engine.emit(tag, time, record)
+        Engine.emit(@tag, time, record)
       }
-    rescue
-      log.warn data.dump, :error => $!.to_s
-      log.debug_backtrace
+    rescue => e
+      log.warn data.dump, :error => e.to_s
+      log.warn_backtrace
     end
 
     private
