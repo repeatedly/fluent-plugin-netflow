@@ -213,3 +213,6 @@
 83:
 - :string
 - :if_desc
+89:
+- :uint8
+- :forwarding_status
