@@ -6,7 +6,7 @@ Accept Netflow logs.
 
 Use RubyGems:
 
-    gem install fluent-plugin-netflow
+    fluent-gem install fluent-plugin-netflow
 
 ## Configuration
 
@@ -25,4 +25,5 @@ Use RubyGems:
 
 ## TODO
 
-* Release as rubygem
+- Support TCP protocol
+- Use Fluentd feature instead of own handlers
