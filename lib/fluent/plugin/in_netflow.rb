@@ -34,7 +34,7 @@ module Fluent
       when 'udp'
         :udp
       else
-        raise ConfigError, "syslog input protocol type should be 'tcp' or 'udp'"
+        raise ConfigError, "netflow input protocol type should be 'udp'"
       end
     end
 
@@ -89,7 +89,7 @@ module Fluent
     private
 
     def listen(callback)
-      log.debug "listening syslog socket on #{@bind}:#{@port} with #{@protocol_type}"
+      log.debug "listening netflow socket on #{@bind}:#{@port} with #{@protocol_type}"
       if @protocol_type == :udp
         @usock = SocketUtil.create_udp_socket(@bind)
         @usock.bind(@bind, @port)
