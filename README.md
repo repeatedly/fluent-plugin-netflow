@@ -2,6 +2,8 @@
 
 Accept Netflow logs.
 
+Netflow parser is based on [Logstash's netflow codes](https://github.com/elasticsearch/logstash/blob/master/lib/logstash/codecs/netflow.rb).
+
 ## Installation
 
 Use RubyGems:
