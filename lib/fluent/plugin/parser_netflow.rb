@@ -443,6 +443,6 @@ module Fluent
       end
     end
 
-    register_template('netflow', self)
+    register_template('netflow', Proc.new { NetflowParser.new })
   end
 end
