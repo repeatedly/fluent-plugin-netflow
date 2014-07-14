@@ -27,5 +27,6 @@ Use RubyGems:
 
 ## TODO
 
-- Support TCP protocol
+- Support TCP protocol? TCP is needed?
 - Use Fluentd feature instead of own handlers
+- Need another maintainer who uses Netflow in production!
