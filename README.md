@@ -23,7 +23,7 @@ Use RubyGems:
       # optional parser parameters
       cache_ttl 6000
       versions [5, 9]
-    </match>
+    </source>
 
 ## TODO
 
