@@ -201,6 +201,15 @@
 - :skip
 69:
 - :skip
+70:
+- :mpls_label
+- :mpls_label_1
+71:
+- :mpls_label
+- :mpls_label_2
+72:
+- :mpls_label
+- :mpls_label_3
 80:
 - :mac_addr
 - :in_dst_mac
