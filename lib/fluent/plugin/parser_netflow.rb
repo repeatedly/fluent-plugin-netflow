@@ -282,6 +282,20 @@ module Fluent
         end
       end
 
+      class MplsLabel < BinData::Primitive
+        bit20 :label
+        bit3  :exp
+        bit1  :bottom
+        def set(val)
+          self.label = val >> 4
+          self.exp = (val & 0b1111) >> 1
+          self.bottom = val & 0b1
+        end
+        def get
+          self.label
+        end
+      end
+
       class Header < BinData::Record
         endian :big
         uint16 :version
