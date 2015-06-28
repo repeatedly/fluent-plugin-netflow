@@ -7,8 +7,8 @@ require 'fluent/parser'
 module Fluent
   class TextParser
     # port from logstash's netflow parser
-    class NetflowParser
-      include Configurable
+    class NetflowParser < Parser
+      Plugin.register_parser('netflow', self)
 
       config_param :cache_ttl, :integer, :default => 4000
       config_param :versions, :default => [5, 9] do |param|
@@ -456,7 +456,5 @@ module Fluent
         end
       end
     end
-
-    register_template('netflow', Proc.new { NetflowParser.new })
   end
 end

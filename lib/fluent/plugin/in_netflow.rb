@@ -79,7 +79,7 @@ module Fluent
         end
 
         record['host'] = host
-        Engine.emit(@tag, time, record)
+        router.emit(@tag, time, record)
       }
     rescue => e
       log.warn data.dump, :error => e.to_s
