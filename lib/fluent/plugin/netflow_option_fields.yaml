@@ -222,6 +222,18 @@
 83:
 - :string
 - :if_desc
+84:
+- :string
+- :sampler_name
 89:
 - :uint8
 - :forwarding_status
+91:
+- :uint8
+- :mpls_prefix_len
+234:
+- :uint32
+- :ingress_vrf_id
+235:
+- :uint32
+- :egress_vrf_id
