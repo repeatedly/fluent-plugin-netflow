@@ -25,7 +25,7 @@ module Fluent
 
         @templates = Vash.new()
         # Path to default Netflow v9 field definitions
-        filename = File.expand_path('../netflow.yaml', __FILE__)
+        filename = File.expand_path('../netflow_option_fields.yaml', __FILE__)
 
         begin
           @fields = YAML.load_file(filename)
@@ -41,6 +41,14 @@ module Fluent
           rescue Exception => e
             raise "Bad syntax in definitions file #{@definitions}"
           end
+        end
+        # Path to default Netflow v9 scope field definitions
+        filename = File.expand_path('../netflow_scope_fields.yaml', __FILE__)
+
+        begin
+          @scopefields = YAML.load_file(filename)
+        rescue Exception => e
+          raise "Bad syntax in scope definitions file #{filename}"
         end
       end
 
@@ -107,7 +115,7 @@ module Fluent
                 catch (:field) do
                   fields = []
                   template.fields.each do |field|
-                    entry = netflow_field_for(field.field_type, field.field_length)
+                    entry = netflow_field_for(field.field_type, field.field_length, @fields)
                     if !entry
                       throw :field
                     end
@@ -126,8 +134,15 @@ module Fluent
               record.flowset_data.templates.each do |template|
                 catch (:field) do
                   fields = []
+                  template.scope_fields.each do |field|
+                    entry = netflow_field_for(field.field_type, field.field_length, @scopefields)
+                    if ! entry
+                      throw :field
+                    end
+                    fields += entry
+                  end
                   template.option_fields.each do |field|
-                    entry = netflow_field_for(field.field_type, field.field_length)
+                    entry = netflow_field_for(field.field_type, field.field_length, @fields)
                     if ! entry
                       throw :field
                     end
@@ -204,9 +219,9 @@ module Fluent
         ("uint" + (((length > 0) ? length : default) * 8).to_s).to_sym
       end
 
-      def netflow_field_for(type, length)
-        if @fields.include?(type)
-          field = @fields[type]
+      def netflow_field_for(type, length, field_definitions)
+        if field_definitions.include?(type)
+          field = field_definitions[type]
           if field.is_a?(Array)
 
             if field[0].is_a?(Integer)
