@@ -140,7 +140,7 @@
 - :uint32
 - :mpls_top_label_ip_addr
 48:
-- 4
+- :uint8
 - :flow_sampler_id
 49:
 - :uint8
