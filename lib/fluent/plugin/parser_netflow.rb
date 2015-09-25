@@ -46,7 +46,7 @@ module Fluent
         filename = File.expand_path('../netflow_scope_fields.yaml', __FILE__)
 
         begin
-          @scopefields = YAML.load_file(filename)
+          @scope_fields = YAML.load_file(filename)
         rescue Exception => e
           raise "Bad syntax in scope definitions file #{filename}"
         end
@@ -135,7 +135,7 @@ module Fluent
                 catch (:field) do
                   fields = []
                   template.scope_fields.each do |field|
-                    entry = netflow_field_for(field.field_type, field.field_length, @scopefields)
+                    entry = netflow_field_for(field.field_type, field.field_length, @scope_fields)
                     if ! entry
                       throw :field
                     end
