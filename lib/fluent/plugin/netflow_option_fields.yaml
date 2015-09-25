@@ -189,8 +189,6 @@
 64:
 - :uint32
 - :ipv6_option_headers
-64:
-- :skip
 65:
 - :skip
 66:
