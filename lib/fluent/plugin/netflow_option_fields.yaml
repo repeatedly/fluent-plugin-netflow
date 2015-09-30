@@ -90,7 +90,7 @@
 - :uint8
 - :ipv6_dst_mask
 31:
-- :uint24
+- 3
 - :ipv6_flow_label
 32:
 - :uint16
@@ -140,7 +140,7 @@
 - :uint32
 - :mpls_top_label_ip_addr
 48:
-- 4
+- 1
 - :flow_sampler_id
 49:
 - :uint8
@@ -189,8 +189,6 @@
 64:
 - :uint32
 - :ipv6_option_headers
-64:
-- :skip
 65:
 - :skip
 66:
@@ -222,6 +220,18 @@
 83:
 - :string
 - :if_desc
+84:
+- :string
+- :sampler_name
 89:
 - :uint8
 - :forwarding_status
+91:
+- :uint8
+- :mpls_prefix_len
+234:
+- :uint32
+- :ingress_vrf_id
+235:
+- :uint32
+- :egress_vrf_id
