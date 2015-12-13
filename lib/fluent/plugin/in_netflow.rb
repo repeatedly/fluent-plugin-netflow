@@ -70,7 +70,7 @@ module Fluent
     protected
 
     def receive_data(host, data)
-      log.debug "received logs", :host => host, :data => data
+      log.on_debug { log.debug "received logs", :host => host, :data => data }
 
       @parser.call(data) { |time, record|
         unless time && record
@@ -89,7 +89,7 @@ module Fluent
     private
 
     def listen(callback)
-      log.debug "listening netflow socket on #{@bind}:#{@port} with #{@protocol_type}"
+      log.info "listening netflow socket on #{@bind}:#{@port} with #{@protocol_type}"
       if @protocol_type == :udp
         @usock = SocketUtil.create_udp_socket(@bind)
         @usock.bind(@bind, @port)
