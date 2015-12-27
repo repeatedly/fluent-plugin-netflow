@@ -11,13 +11,7 @@ module Fluent
       Plugin.register_parser('netflow', self)
 
       config_param :cache_ttl, :integer, :default => 4000
-      config_param :versions, :default => [5, 9] do |param|
-        if param.is_a?(Array)
-          param
-        else
-          param.split(".").map(&:to_i)
-        end
-      end
+      config_param :versions, :array, :default => [5, 9]
       config_param :definitions, :string, :default => nil
 
       def configure(conf)
