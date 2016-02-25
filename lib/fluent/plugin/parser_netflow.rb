@@ -89,8 +89,8 @@ module Fluent
                 seconds = flowset.unix_sec - (millis / 1000)
                 micros = (flowset.unix_nsec / 1000) - (millis % 1000)
                 if micros < 0
-                  seconds--
-                    micros += 1000000
+                  seconds -= 1
+                  micros += 1000000
                 end
 
                 # FIXME Again, probably doing this wrong WRT JRuby?
