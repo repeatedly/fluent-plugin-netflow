@@ -15,21 +15,18 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
+require 'cool.io'
+require 'fluent/plugin/socket_util'
+require 'fluent/plugin/parser_netflow'
+
 module Fluent
   class NetflowInput < Input
     Plugin.register_input('netflow', self)
 
-    def initialize
-      super
-      require 'cool.io'
-      require 'fluent/plugin/socket_util'
-      require 'fluent/plugin/parser_netflow'
-    end
-
-    config_param :port, :integer, :default => 5140
-    config_param :bind, :string, :default => '0.0.0.0'
+    config_param :port, :integer, default: 5140
+    config_param :bind, :string, default: '0.0.0.0'
     config_param :tag, :string
-    config_param :protocol_type, :default => :udp do |val|
+    config_param :protocol_type, default: :udp do |val|
       case val.downcase
       when 'udp'
         :udp
@@ -62,8 +59,8 @@ module Fluent
 
     def run
       @loop.run
-    rescue
-      log.error "unexpected error", :error=>$!.to_s
+    rescue => e
+      log.error "unexpected error", error_class: e.class, error: e.message
       log.error_backtrace
     end
 
@@ -82,7 +79,7 @@ module Fluent
         router.emit(@tag, time, record)
       }
     rescue => e
-      log.warn data.dump, :error => e.to_s
+      log.warn "unexpected error on parsing", data: data.dump, error_class: e.class, error: e.message
       log.warn_backtrace
     end
 
@@ -109,8 +106,9 @@ module Fluent
       def on_readable
         msg, addr = @io.recvfrom_nonblock(4096)
         @callback.call(addr[3], msg)
-      rescue
-        # TODO log?
+      rescue => e
+        log.error "unexpected error on reading from socket", error_class: e.class, error: e.message
+        log.error_backtrace
       end
     end
   end
