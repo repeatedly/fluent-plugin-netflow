@@ -10,9 +10,9 @@ module Fluent
     class NetflowParser < Parser
       Plugin.register_parser('netflow', self)
 
-      config_param :cache_ttl, :integer, :default => 4000
-      config_param :versions, :array, :default => [5, 9]
-      config_param :definitions, :string, :default => nil
+      config_param :cache_ttl, :integer, default: 4000
+      config_param :versions, :array, default: [5, 9]
+      config_param :definitions, :string, default: nil
 
       def configure(conf)
         super
@@ -23,8 +23,8 @@ module Fluent
 
         begin
           @fields = YAML.load_file(filename)
-        rescue Exception => e
-          raise "Bad syntax in definitions file #{filename}"
+        rescue => e
+          raise "Bad syntax in definitions file #{filename}", error_class: e.class, error: e.message
         end
 
         # Allow the user to augment/override/rename the supported Netflow fields
@@ -32,8 +32,8 @@ module Fluent
           raise "definitions file #{@definitions} does not exists" unless File.exist?(@definitions)
           begin
             @fields.merge!(YAML.load_file(@definitions))
-          rescue Exception => e
-            raise "Bad syntax in definitions file #{@definitions}"
+          rescue => e
+            raise "Bad syntax in definitions file #{@definitions}", error_class: e.class, error: e.message
           end
         end
         # Path to default Netflow v9 scope field definitions
@@ -41,8 +41,8 @@ module Fluent
 
         begin
           @scope_fields = YAML.load_file(filename)
-        rescue Exception => e
-          raise "Bad syntax in scope definitions file #{filename}"
+        rescue => e
+          raise "Bad syntax in scope definitions file #{filename}", error_class: e.class, error: e.message
         end
       end
 
@@ -118,7 +118,7 @@ module Fluent
                   # We get this far, we have a list of fields
                   #key = "#{flowset.source_id}|#{event["source"]}|#{template.template_id}"
                   key = "#{flowset.source_id}|#{template.template_id}"
-                  @templates[key, @cache_ttl] = BinData::Struct.new(:endian => :big, :fields => fields)
+                  @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, :fields => fields)
                   # Purge any expired templates
                   @templates.cleanup!
                 end
@@ -145,7 +145,7 @@ module Fluent
                   # We get this far, we have a list of fields
                   #key = "#{flowset.source_id}|#{event["source"]}|#{template.template_id}"
                   key = "#{flowset.source_id}|#{template.template_id}"
-                  @templates[key, @cache_ttl] = BinData::Struct.new(:endian => :big, :fields => fields)
+                  @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, :fields => fields)
                   # Purge any expired templates
                   @templates.cleanup!
                 end
@@ -166,11 +166,12 @@ module Fluent
               # Template shouldn't be longer than the record and there should
               # be at most 3 padding bytes
               if template.num_bytes > length or ! (length % template.num_bytes).between?(0, 3)
-                $log.warn("Template length doesn't fit cleanly into flowset", :template_id => record.flowset_id, :template_length => template.num_bytes, :record_length => length)
+                $log.warn "Template length doesn't fit cleanly into flowset",
+                          template_id: record.flowset_id, template_length: template.num_bytes, record_length: length
                 next
               end
 
-              array = BinData::Array.new(:type => template, :initial_length => length / template.num_bytes)
+              array = BinData::Array.new(type: template, initial_length: length / template.num_bytes)
 
               records = array.read(record.flowset_data)
               records.each do |r|
@@ -200,7 +201,7 @@ module Fluent
                 yield time, event
               end
             else
-              $log.warn("Unsupported flowset id #{record.flowset_id}")
+              $log.warn "Unsupported flowset id #{record.flowset_id}"
             end
           end
         end
@@ -226,18 +227,18 @@ module Fluent
             # is dynamic
             case field[0]
             when :skip
-              field += [nil, {:length => length}]
+              field += [nil, {length: length}]
             when :string
-              field += [{:length => length, :trim_padding => true}]
+              field += [{length: length, trim_padding: true}]
             end
 
             [field]
           else
-            $log.warn("Definition should be an array", :field => field)
+            $log.warn "Definition should be an array", field: field
             nil
           end
         else
-          $log.warn("Unsupported field", :type => type, :length => length)
+          $log.warn "Unsupported field", type: type, length: length)
           nil
         end
       end
@@ -279,7 +280,7 @@ module Fluent
       end
 
       class MacAddr < BinData::Primitive
-        array :bytes, :type => :uint8, :initial_length => 6
+        array :bytes, type: :uint8, initial_length: 6
 
         def set(val)
           ints = val.split(/:/).collect { |int| int.to_i(16) }
@@ -322,7 +323,7 @@ module Fluent
         uint8  :engine_id
         bit2   :sampling_algorithm
         bit14  :sampling_interval
-        array  :records, :initial_length => :flow_records do
+        array  :records, initial_length: :flow_records do
           ip4_addr :ipv4_src_addr
           ip4_addr :ipv4_dst_addr
           ip4_addr :ipv4_next_hop
@@ -334,7 +335,7 @@ module Fluent
           uint32   :last_switched
           uint16   :l4_src_port
           uint16   :l4_dst_port
-          skip     :length => 1
+          skip     length: 1
           uint8    :tcp_flags # Split up the TCP flags maybe?
           uint8    :protocol
           uint8    :src_tos
@@ -342,13 +343,13 @@ module Fluent
           uint16   :dst_as
           uint8    :src_mask
           uint8    :dst_mask
-          skip     :length => 2
+          skip     length: 2
         end
       end
 
       class TemplateFlowset < BinData::Record
         endian :big
-        array  :templates, :read_until => lambda { array.num_bytes == flowset_length - 4 } do
+        array  :templates, read_until: lambda { array.num_bytes == flowset_length - 4 } do
           uint16 :template_id
           uint16 :field_count
           array  :fields, :initial_length => :field_count do
@@ -360,20 +361,20 @@ module Fluent
 
       class OptionFlowset < BinData::Record
         endian :big
-        array  :templates, :read_until => lambda { flowset_length - 4 - array.num_bytes <= 2 } do
+        array  :templates, read_until: lambda { flowset_length - 4 - array.num_bytes <= 2 } do
           uint16 :template_id
           uint16 :scope_length
           uint16 :option_length
-          array  :scope_fields, :initial_length => lambda { scope_length / 4 } do
+          array  :scope_fields, initial_length: lambda { scope_length / 4 } do
             uint16 :field_type
             uint16 :field_length
           end
-          array  :option_fields, :initial_length => lambda { option_length / 4 } do
+          array  :option_fields, initial_length: lambda { option_length / 4 } do
             uint16 :field_type
             uint16 :field_length
           end
         end
-        skip   :length => lambda { templates.length.odd? ? 2 : 0 }
+        skip   length: lambda { templates.length.odd? ? 2 : 0 }
       end
 
       class Netflow9PDU < BinData::Record
@@ -384,13 +385,13 @@ module Fluent
         uint32 :unix_sec
         uint32 :flow_seq_num
         uint32 :source_id
-        array  :records, :read_until => :eof do
+        array  :records, read_until: :eof do
           uint16 :flowset_id
           uint16 :flowset_length
-          choice :flowset_data, :selection => :flowset_id do
+          choice :flowset_data, selection: :flowset_id do
             template_flowset 0
             option_flowset   1
-            string           :default, :read_length => lambda { flowset_length - 4 }
+            string           :default, read_length: lambda { flowset_length - 4 }
           end
         end
       end
