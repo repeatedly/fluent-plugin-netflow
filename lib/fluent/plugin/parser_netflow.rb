@@ -118,32 +118,7 @@ module Fluent
           when 0
             handle_v9_flowset_template(flowset, record)
           when 1
-            # Options template flowset
-            record.flowset_data.templates.each do |template|
-              catch (:field) do
-                fields = []
-                template.scope_fields.each do |field|
-                  entry = netflow_field_for(field.field_type, field.field_length, @scope_fields)
-                  if ! entry
-                    throw :field
-                  end
-                  fields += entry
-                end
-                template.option_fields.each do |field|
-                  entry = netflow_field_for(field.field_type, field.field_length, @fields)
-                  if ! entry
-                    throw :field
-                  end
-                  fields += entry
-                end
-                # We get this far, we have a list of fields
-                #key = "#{flowset.source_id}|#{event["source"]}|#{template.template_id}"
-                key = "#{flowset.source_id}|#{template.template_id}"
-                @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, :fields => fields)
-                # Purge any expired templates
-                @templates.cleanup!
-              end
-            end
+            handle_v9_flowset_options_template(flowset, record)
           when 256..65535
             # Data flowset
             #key = "#{flowset.source_id}|#{event["source"]}|#{record.flowset_id}"
@@ -214,6 +189,33 @@ module Fluent
             # We get this far, we have a list of fields
             key = "#{flowset.source_id}|#{template.template_id}"
             @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
+            # Purge any expired templates
+            @templates.cleanup!
+          end
+        end
+      end
+
+      def handle_v9_flowset_options_template(flowset, record)
+        record.flowset_data.templates.each do |template|
+          catch (:field) do
+            fields = []
+            template.scope_fields.each do |field|
+              entry = netflow_field_for(field.field_type, field.field_length, @scope_fields)
+              if ! entry
+                throw :field
+              end
+              fields += entry
+            end
+            template.option_fields.each do |field|
+              entry = netflow_field_for(field.field_type, field.field_length, @fields)
+              if ! entry
+                throw :field
+              end
+              fields += entry
+            end
+            # We get this far, we have a list of fields
+            key = "#{flowset.source_id}|#{template.template_id}"
+            @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, :fields => fields)
             # Purge any expired templates
             @templates.cleanup!
           end
