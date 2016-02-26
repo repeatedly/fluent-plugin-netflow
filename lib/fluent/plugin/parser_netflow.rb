@@ -116,25 +116,7 @@ module Fluent
         flowset.records.each do |record|
           case record.flowset_id
           when 0
-            # Template flowset
-            record.flowset_data.templates.each do |template|
-              catch (:field) do
-                fields = []
-                template.fields.each do |field|
-                  entry = netflow_field_for(field.field_type, field.field_length, @fields)
-                  if !entry
-                    throw :field
-                  end
-                  fields += entry
-                end
-                # We get this far, we have a list of fields
-                #key = "#{flowset.source_id}|#{event["source"]}|#{template.template_id}"
-                key = "#{flowset.source_id}|#{template.template_id}"
-                @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, :fields => fields)
-                # Purge any expired templates
-                @templates.cleanup!
-              end
-            end
+            handle_v9_flowset_template(flowset, record)
           when 1
             # Options template flowset
             record.flowset_data.templates.each do |template|
@@ -214,6 +196,26 @@ module Fluent
             end
           else
             $log.warn "Unsupported flowset id #{record.flowset_id}"
+          end
+        end
+      end
+
+      def handle_v9_flowset_template(flowset, record)
+        record.flowset_data.templates.each do |template|
+          catch (:field) do
+            fields = []
+            template.fields.each do |field|
+              entry = netflow_field_for(field.field_type, field.field_length, @fields)
+              if !entry
+                throw :field
+              end
+              fields += entry
+            end
+            # We get this far, we have a list of fields
+            key = "#{flowset.source_id}|#{template.template_id}"
+            @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
+            # Purge any expired templates
+            @templates.cleanup!
           end
         end
       end
