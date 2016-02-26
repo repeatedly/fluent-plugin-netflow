@@ -167,7 +167,7 @@ module Fluent
             end
             # We get this far, we have a list of fields
             key = "#{flowset.source_id}|#{template.template_id}"
-            @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, :fields => fields)
+            @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
             # Purge any expired templates
             @templates.cleanup!
           end
@@ -368,7 +368,7 @@ module Fluent
         array  :templates, read_until: lambda { array.num_bytes == flowset_length - 4 } do
           uint16 :template_id
           uint16 :field_count
-          array  :fields, :initial_length => :field_count do
+          array  :fields, initial_length: :field_count do
             uint16 :field_type
             uint16 :field_length
           end
