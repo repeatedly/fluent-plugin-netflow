@@ -55,6 +55,8 @@ module Fluent
 
         if header.version == 5
           flowset = Netflow5PDU.read(payload)
+          handle_v5(flowset, block)
+          return
         elsif header.version == 9
           flowset = Netflow9PDU.read(payload)
         else
@@ -64,43 +66,7 @@ module Fluent
 
         flowset.records.each do |record|
           if flowset.version == 5
-            event = {}
-
-            # FIXME Probably not doing this right WRT JRuby?
-            #
-            # The flowset header gives us the UTC epoch seconds along with
-            # residual nanoseconds so we can set @timestamp to that easily
-            time = flowset.unix_sec
-
-            # Copy some of the pertinent fields in the header to the event
-            ['version', 'flow_seq_num', 'engine_type', 'engine_id', 'sampling_algorithm', 'sampling_interval', 'flow_records'].each do |f|
-              event[f] = flowset[f]
-            end
-
-            # Create fields in the event from each field in the flow record
-            record.each_pair do |k,v|
-              case k.to_s
-              when /_switched$/
-                # The flow record sets the first and last times to the device
-                # uptime in milliseconds. Given the actual uptime is provided
-                # in the flowset header along with the epoch seconds we can
-                # convert these into absolute times
-                millis = flowset.uptime - v
-                seconds = flowset.unix_sec - (millis / 1000)
-                micros = (flowset.unix_nsec / 1000) - (millis % 1000)
-                if micros < 0
-                  seconds -= 1
-                  micros += 1000000
-                end
-
-                # FIXME Again, probably doing this wrong WRT JRuby?
-                event[k.to_s] = Time.at(seconds, micros).utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
-              else
-                event[k.to_s] = v
-              end
-            end
-
-            block.call(time, event)
+            raise "unreachable here"
           elsif flowset.version == 9
             case record.flowset_id
             when 0
@@ -208,6 +174,48 @@ module Fluent
       end
 
       private
+
+      def handle_v5(flowset, block)
+        flowset.records.each do |record|
+          event = {}
+
+          # FIXME Probably not doing this right WRT JRuby?
+          #
+          # The flowset header gives us the UTC epoch seconds along with
+          # residual nanoseconds so we can set @timestamp to that easily
+          time = flowset.unix_sec
+
+          # Copy some of the pertinent fields in the header to the event
+          ['version', 'flow_seq_num', 'engine_type', 'engine_id', 'sampling_algorithm', 'sampling_interval', 'flow_records'].each do |f|
+            event[f] = flowset[f]
+          end
+
+          # Create fields in the event from each field in the flow record
+          record.each_pair do |k,v|
+            case k.to_s
+            when /_switched$/
+              # The flow record sets the first and last times to the device
+              # uptime in milliseconds. Given the actual uptime is provided
+              # in the flowset header along with the epoch seconds we can
+              # convert these into absolute times
+              millis = flowset.uptime - v
+              seconds = flowset.unix_sec - (millis / 1000)
+              micros = (flowset.unix_nsec / 1000) - (millis % 1000)
+              if micros < 0
+                seconds -= 1
+                micros += 1000000
+              end
+
+              # FIXME Again, probably doing this wrong WRT JRuby?
+              event[k.to_s] = Time.at(seconds, micros).utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+            else
+              event[k.to_s] = v
+            end
+          end
+
+          block.call(time, event)
+        end
+      end
 
       def uint_field(length, default)
         # If length is 4, return :uint32, etc. and use default if length is 0
