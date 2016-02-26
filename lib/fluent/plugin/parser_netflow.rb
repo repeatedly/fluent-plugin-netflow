@@ -46,7 +46,7 @@ module Fluent
         end
       end
 
-      def call(payload)
+      def call(payload, &block)
         header = Header.read(payload)
         unless @versions.include?(header.version)
           $log.warn "Ignoring Netflow version v#{header.version}"
@@ -100,7 +100,7 @@ module Fluent
               end
             end
 
-            yield time, event
+            block.call(time, event)
           elsif flowset.version == 9
             case record.flowset_id
             when 0
@@ -198,7 +198,7 @@ module Fluent
                   end
                 end
 
-                yield time, event
+                block.call(time, event)
               end
             else
               $log.warn "Unsupported flowset id #{record.flowset_id}"
