@@ -120,55 +120,7 @@ module Fluent
           when 1
             handle_v9_flowset_options_template(flowset, record)
           when 256..65535
-            # Data flowset
-            #key = "#{flowset.source_id}|#{event["source"]}|#{record.flowset_id}"
-            key = "#{flowset.source_id}|#{record.flowset_id}"
-            template = @templates[key]
-            if ! template
-              #$log.warn("No matching template for flow id #{record.flowset_id} from #{event["source"]}")
-              $log.warn("No matching template for flow id #{record.flowset_id}")
-              next
-            end
-
-            length = record.flowset_length - 4
-
-            # Template shouldn't be longer than the record and there should
-            # be at most 3 padding bytes
-            if template.num_bytes > length or ! (length % template.num_bytes).between?(0, 3)
-              $log.warn "Template length doesn't fit cleanly into flowset",
-              template_id: record.flowset_id, template_length: template.num_bytes, record_length: length
-              next
-            end
-
-            array = BinData::Array.new(type: template, initial_length: length / template.num_bytes)
-
-            records = array.read(record.flowset_data)
-            records.each do |r|
-              time = flowset.unix_sec
-              event = {}
-
-              # Fewer fields in the v9 header
-              ['version', 'flow_seq_num'].each do |f|
-                event[f] = flowset[f]
-              end
-
-              event['flowset_id'] = record.flowset_id
-
-              r.each_pair do |k,v|
-                case k.to_s
-                when /_switched$/
-                  millis = flowset.uptime - v
-                  seconds = flowset.unix_sec - (millis / 1000)
-                  # v9 did away with the nanosecs field
-                  micros = 1000000 - (millis % 1000)
-                  event[k.to_s] = Time.at(seconds, micros).utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
-                else
-                  event[k.to_s] = v
-                end
-              end
-
-              block.call(time, event)
-            end
+            handle_v9_flowset_data(flowset, record, block)
           else
             $log.warn "Unsupported flowset id #{record.flowset_id}"
           end
@@ -219,6 +171,57 @@ module Fluent
             # Purge any expired templates
             @templates.cleanup!
           end
+        end
+      end
+
+      FIELDS_FOR_COPY_V9 = ['version', 'flow_seq_num']
+
+      def handle_v9_flowset_data(flowset, record, block)
+        key = "#{flowset.source_id}|#{record.flowset_id}"
+        template = @templates[key]
+        if ! template
+          $log.warn("No matching template for flow id #{record.flowset_id}")
+          next
+        end
+
+        length = record.flowset_length - 4
+
+        # Template shouldn't be longer than the record and there should
+        # be at most 3 padding bytes
+        if template.num_bytes > length or ! (length % template.num_bytes).between?(0, 3)
+          $log.warn "Template length doesn't fit cleanly into flowset",
+                    template_id: record.flowset_id, template_length: template.num_bytes, record_length: length
+          next
+        end
+
+        array = BinData::Array.new(type: template, initial_length: length / template.num_bytes)
+
+        records = array.read(record.flowset_data)
+        records.each do |r|
+          time = flowset.unix_sec
+          event = {}
+
+          # Fewer fields in the v9 header
+          FIELDS_FOR_COPY_V9.each do |f|
+            event[f] = flowset[f]
+          end
+
+          event['flowset_id'] = record.flowset_id
+
+          r.each_pair do |k,v|
+            case k.to_s
+            when /_switched$/
+              millis = flowset.uptime - v
+              seconds = flowset.unix_sec - (millis / 1000)
+              # v9 did away with the nanosecs field
+              micros = 1000000 - (millis % 1000)
+              event[k.to_s] = Time.at(seconds, micros).utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+            else
+              event[k.to_s] = v
+            end
+          end
+
+          block.call(time, event)
         end
       end
 
