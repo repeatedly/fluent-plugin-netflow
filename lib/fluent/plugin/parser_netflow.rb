@@ -181,7 +181,7 @@ module Fluent
         template = @templates[key]
         if ! template
           $log.warn("No matching template for flow id #{record.flowset_id}")
-          next
+          return
         end
 
         length = record.flowset_length - 4
@@ -191,7 +191,7 @@ module Fluent
         if template.num_bytes > length or ! (length % template.num_bytes).between?(0, 3)
           $log.warn "Template length doesn't fit cleanly into flowset",
                     template_id: record.flowset_id, template_length: template.num_bytes, record_length: length
-          next
+          return
         end
 
         array = BinData::Array.new(type: template, initial_length: length / template.num_bytes)
