@@ -66,6 +66,10 @@ module Fluent
 
       private
 
+      FIELDS_FOR_COPY_V5 = [
+        'version', 'flow_seq_num', 'engine_type', 'engine_id', 'sampling_algorithm', 'sampling_interval', 'flow_records',
+      ]
+
       def handle_v5(flowset, block)
         flowset.records.each do |record|
           event = {}
@@ -77,7 +81,7 @@ module Fluent
           time = flowset.unix_sec
 
           # Copy some of the pertinent fields in the header to the event
-          ['version', 'flow_seq_num', 'engine_type', 'engine_id', 'sampling_algorithm', 'sampling_interval', 'flow_records'].each do |f|
+          FIELDS_FOR_COPY_V5.each do |f|
             event[f] = flowset[f]
           end
 
