@@ -79,33 +79,6 @@ class NetflowParserTest < Test::Unit::TestCase
     time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
   end
 
-  test 'switched time logic: it is wrong' do
-    require 'ostruct'
-    # 15:07:30.123456789
-    current_time = Time.at(Rational(Time.parse('2016-02-29 15:07:30 -0800').to_i) + Rational(123_456_789, 1_000_000_000))
-    # 1day 17hours 56minutes 42seconds 827milliseconds
-    uptime = (((1 * 24 + 17) * 60 + 56) * 60 + 42) * 1000 + 827
-
-    flowset = OpenStruct.new
-    flowset.uptime = uptime
-    flowset.unix_sec = current_time.to_i
-    flowset.unix_nsec = current_time.nsec
-
-    switched_time = ->(flowset, v){
-      millis = flowset.uptime - v
-      seconds = flowset.unix_sec - (millis / 1000)
-      micros = (flowset.unix_nsec / 1000) - (millis % 1000)
-      if micros < 0
-        seconds -= 1
-        micros += 1000000
-      end
-      Time.at(seconds, micros)
-    }
-    s1 = switched_time.(flowset, uptime - 19000) # 19 seconds ago
-    s2 = switched_time.(flowset, uptime - 18500) # 18.5 seconds ago
-    assert_equal 0.5, s2 - s1
-  end
-
   test 'parse v5 binary data contains 1 record, generated from definition' do
     parser = create_parser
     parsed = []
