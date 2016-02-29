@@ -16,6 +16,11 @@ module Fluent
       config_param :versions, :array, default: [5, 9]
       config_param :definitions, :string, default: nil
 
+      # Cisco NetFlow Export Datagram Format
+      # http://www.cisco.com/c/en/us/td/docs/net_mgmt/netflow_collection_engine/3-6/user/guide/format.html
+      # Cisco NetFlow Version 9 Flow-Record Format
+      # http://www.cisco.com/en/US/technologies/tk648/tk362/technologies_white_paper09186a00800a3db9.html
+
       def configure(conf)
         super
 
