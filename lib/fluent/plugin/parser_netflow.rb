@@ -73,7 +73,7 @@ module Fluent
         "#{(uint32 & 0xff000000) >> 24}.#{(uint32 & 0x00ff0000) >> 16}.#{(uint32 & 0x0000ff00) >> 8}.#{uint32 & 0x000000ff}"
       end
 
-      NETFLOW_V5_HEADER_FORMAT = 'nnNNNNxxxx'
+      NETFLOW_V5_HEADER_FORMAT = 'nnNNNNnn'
       NETFLOW_V5_HEADER_BYTES  = 24
       NETFLOW_V5_RECORD_FORMAT = 'NNNnnNNNNnnnnnnnxx'
       NETFLOW_V5_RECORD_BYTES  = 48
@@ -85,10 +85,10 @@ module Fluent
       # uint32 :unix_sec       # N
       # uint32 :unix_nsec      # N
       # uint32 :flow_seq_num   # N
-      # uint8  :engine_type    # x
-      # uint8  :engine_id      # x
-      # bit2   :sampling_algorithm #
-      # bit14  :sampling_interval  # xx
+      # uint8  :engine_type    # n -> 0xff00
+      # uint8  :engine_id      #   -> 0x00ff
+      # bit2   :sampling_algorithm # n -> 0b1100000000000000
+      # bit14  :sampling_interval  #   -> 0b0011111111111111
 
       # V5 records
       # array  :records, initial_length: :flow_records do
@@ -114,7 +114,12 @@ module Fluent
       #   skip     length: 2 # xx
       # end
       def forV5(payload, block)
-        version, flow_records, uptime, unix_sec, unix_nsec, flow_seq_num = payload.unpack(NETFLOW_V5_HEADER_FORMAT)
+        version, flow_records, uptime, unix_sec, unix_nsec, flow_seq_num, engine, sampling = payload.unpack(NETFLOW_V5_HEADER_FORMAT)
+        engine_type = (engine & 0xff00) >> 8
+        engine_id = engine & 0x00ff
+        sampling_algorithm = (sampling & 0b1100000000000000) >> 14
+        sampling_interval = sampling & 0b0011111111111111
+
         time = Time.at(unix_sec, unix_nsec / 1000).to_i # TODO: Fluent::EventTime
 
         records_bytes = payload.bytesize - NETFLOW_V5_HEADER_BYTES
@@ -132,9 +137,17 @@ module Fluent
           in_pkts, in_bytes, first_switched, last_switched, l4_src_port, l4_dst_port,
           tcp_flags_16, protocol_src_tos, src_as, dst_as, src_dst_mask = objects.shift(16)
           record = {
-            "src_addr" => ipv4_addr_to_string(src_addr),
-            "dst_addr" => ipv4_addr_to_string(dst_addr),
-            "next_hop" => ipv4_addr_to_string(next_hop),
+            "version" => version,
+            "flow_records" => flow_records,
+            "flow_seq_num" => flow_seq_num,
+            "engine_type"  => engine_type,
+            "engine_id"    => engine_id,
+            "sampling_algorithm" => sampling_algorithm,
+            "sampling_interval"  => sampling_interval,
+
+            "ipv4_src_addr" => ipv4_addr_to_string(src_addr),
+            "ipv4_dst_addr" => ipv4_addr_to_string(dst_addr),
+            "ipv4_next_hop" => ipv4_addr_to_string(next_hop),
             "input_snmp"  => input_snmp,
             "output_snmp" => output_snmp,
             "in_pkts"  => in_pkts,
@@ -157,7 +170,7 @@ module Fluent
             "last_switched"  => last_switched,
             "l4_src_port" => l4_src_port,
             "l4_dst_port" => l4_dst_port,
-            "tcp_flag" => tcp_flags_16 & 0x00ff,
+            "tcp_flags" => tcp_flags_16 & 0x00ff,
             "protocol" => (protocol_src_tos & 0xff00) >> 8,
             "src_tos"  => (protocol_src_tos & 0x00ff),
             "src_as"   => src_as,
