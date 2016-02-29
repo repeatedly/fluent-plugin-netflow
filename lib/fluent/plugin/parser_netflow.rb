@@ -69,6 +69,10 @@ module Fluent
 
       private
 
+      def ipv4_addr_to_string(uint32)
+        "#{(uint32 & 0xff000000) >> 24}.#{(uint32 & 0x00ff0000) >> 16}.#{(uint32 & 0x0000ff00) >> 8}.#{uint32 & 0x000000ff}"
+      end
+
       NETFLOW_V5_HEADER_FORMAT = 'nnNNNNxxxx'
       NETFLOW_V5_HEADER_BYTES  = 24
       NETFLOW_V5_RECORD_FORMAT = 'NNNnnNNNNnnnnnnnxx'
@@ -128,9 +132,9 @@ module Fluent
           in_pkts, in_bytes, first_switched, last_switched, l4_src_port, l4_dst_port,
           tcp_flags_16, protocol_src_tos, src_as, dst_as, src_dst_mask = objects.shift(16)
           record = {
-            "src_addr" => src_addr,
-            "dst_addr" => dst_addr,
-            "next_hop" => next_hop,
+            "src_addr" => ipv4_addr_to_string(src_addr),
+            "dst_addr" => ipv4_addr_to_string(dst_addr),
+            "next_hop" => ipv4_addr_to_string(next_hop),
             "input_snmp"  => input_snmp,
             "output_snmp" => output_snmp,
             "in_pkts"  => in_pkts,
