@@ -20,4 +20,5 @@ Gem::Specification.new do |gem|
   gem.add_dependency "fluentd", [">= 0.10.17", "< 2"]
   gem.add_dependency "bindata", "~> 2.1"
   gem.add_development_dependency "rake", ">= 0.9.2"
+  gem.add_development_dependency "test-unit", "~> 3.0"
 end
