@@ -169,20 +169,6 @@ module Fluent
             "output_snmp" => output_snmp,
             "in_pkts"  => in_pkts,
             "in_bytes" => in_bytes,
-            # when /_switched$/
-            #   # The flow record sets the first and last times to the device
-            #   # uptime in milliseconds. Given the actual uptime is provided
-            #   # in the flowset header along with the epoch seconds we can
-            #   # convert these into absolute times
-            #   millis = flowset.uptime - v
-            #   seconds = flowset.unix_sec - (millis / 1000)
-            #   micros = (flowset.unix_nsec / 1000) - (millis % 1000)
-            #   if micros < 0
-            #     seconds -= 1
-            #     micros += 1000000
-            #   end
-            #   # FIXME Again, probably doing this wrong WRT JRuby?
-            #   event[k.to_s] = Time.at(seconds, micros).utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
             "first_switched" => first_switched,
             "last_switched"  => last_switched,
             "l4_src_port" => l4_src_port,
