@@ -12,6 +12,7 @@ module Fluent
     class NetflowParser < Parser
       Plugin.register_parser('netflow', self)
 
+      config_param :switched_times_from_uptime, :bool, default: false
       config_param :cache_ttl, :integer, default: 4000
       config_param :versions, :array, default: [5, 9]
       config_param :definitions, :string, default: nil
@@ -54,68 +55,138 @@ module Fluent
       end
 
       def call(payload, &block)
-        header = Header.read(payload)
-        unless @versions.include?(header.version)
-          $log.warn "Ignoring Netflow version v#{header.version}"
-          return
-        end
-
-        if header.version == 5
-          flowset = Netflow5PDU.read(payload)
-          handle_v5(flowset, block)
-        elsif header.version == 9
+        version,_ = payload[0,2].unpack('n')
+        case version
+        when 5
+          forV5(payload, block)
+        when 9
+          # TODO: implement forV9
           flowset = Netflow9PDU.read(payload)
           handle_v9(flowset, block)
         else
-          $log.warn "Unsupported Netflow version v#{header.version}"
+          $log.warn "Unsupported Netflow version v#{version}: #{version.class}"
         end
       end
 
       private
 
-      FIELDS_FOR_COPY_V5 = [
-        'version', 'flow_seq_num', 'engine_type', 'engine_id', 'sampling_algorithm', 'sampling_interval', 'flow_records',
-      ]
+      def ipv4_addr_to_string(uint32)
+        "#{(uint32 & 0xff000000) >> 24}.#{(uint32 & 0x00ff0000) >> 16}.#{(uint32 & 0x0000ff00) >> 8}.#{uint32 & 0x000000ff}"
+      end
 
-      def handle_v5(flowset, block)
-        flowset.records.each do |record|
-          event = {}
+      def msec_from_boot_to_time(msec, uptime, current_unix_time, current_nsec)
+        millis = uptime - msec
+        seconds = current_unix_time - (millis / 1000)
+        micros = (current_nsec / 1000) - ((millis % 1000) * 1000)
+        if micros < 0
+          seconds -= 1
+          micros += 1000000
+        end
+        Time.at(seconds, micros)
+      end
 
-          # FIXME Probably not doing this right WRT JRuby?
-          #
-          # The flowset header gives us the UTC epoch seconds along with
-          # residual nanoseconds so we can set @timestamp to that easily
-          time = flowset.unix_sec
+      def format_for_switched(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+      end
 
-          # Copy some of the pertinent fields in the header to the event
-          FIELDS_FOR_COPY_V5.each do |f|
-            event[f] = flowset[f]
+      NETFLOW_V5_HEADER_FORMAT = 'nnNNNNnn'
+      NETFLOW_V5_HEADER_BYTES  = 24
+      NETFLOW_V5_RECORD_FORMAT = 'NNNnnNNNNnnnnnnnxx'
+      NETFLOW_V5_RECORD_BYTES  = 48
+
+      # V5 header
+      # uint16 :version        # n
+      # uint16 :flow_records   # n
+      # uint32 :uptime         # N
+      # uint32 :unix_sec       # N
+      # uint32 :unix_nsec      # N
+      # uint32 :flow_seq_num   # N
+      # uint8  :engine_type    # n -> 0xff00
+      # uint8  :engine_id      #   -> 0x00ff
+      # bit2   :sampling_algorithm # n -> 0b1100000000000000
+      # bit14  :sampling_interval  #   -> 0b0011111111111111
+
+      # V5 records
+      # array  :records, initial_length: :flow_records do
+      #   ip4_addr :ipv4_src_addr # uint32 N
+      #   ip4_addr :ipv4_dst_addr # uint32 N
+      #   ip4_addr :ipv4_next_hop # uint32 N
+      #   uint16   :input_snmp    # n
+      #   uint16   :output_snmp   # n
+      #   uint32   :in_pkts       # N
+      #   uint32   :in_bytes      # N
+      #   uint32   :first_switched # N
+      #   uint32   :last_switched  # N
+      #   uint16   :l4_src_port    # n
+      #   uint16   :l4_dst_port    # n
+      #   skip     length: 1  # n -> (ignored)
+      #   uint8    :tcp_flags #   -> 0x00ff
+      #   uint8    :protocol  # n -> 0xff00
+      #   uint8    :src_tos   #   -> 0x00ff
+      #   uint16   :src_as   # n
+      #   uint16   :dst_as   # n
+      #   uint8    :src_mask # n -> 0xff00
+      #   uint8    :dst_mask #   -> 0x00ff
+      #   skip     length: 2 # xx
+      # end
+      def forV5(payload, block)
+        version, flow_records, uptime, unix_sec, unix_nsec, flow_seq_num, engine, sampling = payload.unpack(NETFLOW_V5_HEADER_FORMAT)
+        engine_type = (engine & 0xff00) >> 8
+        engine_id = engine & 0x00ff
+        sampling_algorithm = (sampling & 0b1100000000000000) >> 14
+        sampling_interval = sampling & 0b0011111111111111
+
+        time = Time.at(unix_sec, unix_nsec / 1000).to_i # TODO: Fluent::EventTime
+
+        records_bytes = payload.bytesize - NETFLOW_V5_HEADER_BYTES
+
+        if records_bytes / NETFLOW_V5_RECORD_BYTES != flow_records
+          $log.warn "bytesize mismatch, records_bytes:#{records_bytes}, records:#{flow_records}"
+          return
+        end
+
+        format_full = NETFLOW_V5_RECORD_FORMAT * flow_records
+        objects = payload[NETFLOW_V5_HEADER_BYTES, records_bytes].unpack(format_full)
+
+        while objects.size > 0
+          src_addr, dst_addr, next_hop, input_snmp, output_snmp,
+          in_pkts, in_bytes, first_switched, last_switched, l4_src_port, l4_dst_port,
+          tcp_flags_16, protocol_src_tos, src_as, dst_as, src_dst_mask = objects.shift(16)
+          record = {
+            "version" => version,
+            "uptime"  => uptime,
+            "flow_records" => flow_records,
+            "flow_seq_num" => flow_seq_num,
+            "engine_type"  => engine_type,
+            "engine_id"    => engine_id,
+            "sampling_algorithm" => sampling_algorithm,
+            "sampling_interval"  => sampling_interval,
+
+            "ipv4_src_addr" => ipv4_addr_to_string(src_addr),
+            "ipv4_dst_addr" => ipv4_addr_to_string(dst_addr),
+            "ipv4_next_hop" => ipv4_addr_to_string(next_hop),
+            "input_snmp"  => input_snmp,
+            "output_snmp" => output_snmp,
+            "in_pkts"  => in_pkts,
+            "in_bytes" => in_bytes,
+            "first_switched" => first_switched,
+            "last_switched"  => last_switched,
+            "l4_src_port" => l4_src_port,
+            "l4_dst_port" => l4_dst_port,
+            "tcp_flags" => tcp_flags_16 & 0x00ff,
+            "protocol" => (protocol_src_tos & 0xff00) >> 8,
+            "src_tos"  => (protocol_src_tos & 0x00ff),
+            "src_as"   => src_as,
+            "dst_as"   => dst_as,
+            "src_mask" => (src_dst_mask & 0xff00) >> 8,
+            "dst_mask" => (src_dst_mask & 0x00ff)
+          }
+          unless @switched_times_from_uptime
+            record["first_switched"] = format_for_switched(msec_from_boot_to_time(record["first_switched"], uptime, unix_sec, unix_nsec))
+            record["last_switched"]  = format_for_switched(msec_from_boot_to_time(record["last_switched"] , uptime, unix_sec, unix_nsec))
           end
 
-          # Create fields in the event from each field in the flow record
-          record.each_pair do |k,v|
-            case k.to_s
-            when /_switched$/
-              # The flow record sets the first and last times to the device
-              # uptime in milliseconds. Given the actual uptime is provided
-              # in the flowset header along with the epoch seconds we can
-              # convert these into absolute times
-              millis = flowset.uptime - v
-              seconds = flowset.unix_sec - (millis / 1000)
-              micros = (flowset.unix_nsec / 1000) - (millis % 1000)
-              if micros < 0
-                seconds -= 1
-                micros += 1000000
-              end
-
-              # FIXME Again, probably doing this wrong WRT JRuby?
-              event[k.to_s] = Time.at(seconds, micros).utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
-            else
-              event[k.to_s] = v
-            end
-          end
-
-          block.call(time, event)
+          block.call(time, record)
         end
       end
 

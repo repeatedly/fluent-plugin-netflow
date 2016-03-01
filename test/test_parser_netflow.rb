@@ -5,9 +5,9 @@ class NetflowParserTest < Test::Unit::TestCase
     Fluent::Test.setup
   end
 
-  def create_parser(conf=nil)
+  def create_parser(conf={})
     parser = Fluent::TextParser::NetflowParser.new
-    parser.configure(conf || Fluent::Config::Element.new('ROOT', '', {}, []))
+    parser.configure(Fluent::Config::Element.new('ROOT', '', conf, []))
     parser
   end
 
@@ -32,6 +32,7 @@ class NetflowParserTest < Test::Unit::TestCase
     expected_record = {
       # header
       "version" => 5,
+      "uptime"  => 1785097000,
       "flow_records" => 1,
       "flow_seq_num" => 1,
       "engine_type" => 1,
@@ -47,8 +48,8 @@ class NetflowParserTest < Test::Unit::TestCase
       "output_snmp" => 2,
       "in_pkts"  => 173,
       "in_bytes" => 4581,
-      "first_switched" => "2016-02-29T19:14:00.089Z",
-      "last_switched"  => "2016-02-29T19:14:00.090Z", # This value should be wrong, but assigned as is currently
+      "first_switched" => "2016-02-29T19:13:59.215Z",
+      "last_switched"  => "2016-02-29T19:14:00.090Z",
       "l4_src_port" => 1001,
       "l4_dst_port" => 3001,
       "tcp_flags" => 27,
@@ -68,42 +69,127 @@ class NetflowParserTest < Test::Unit::TestCase
   DEFAULT_TIME = Time.parse('2016-02-29 11:14:00 -0800').to_i
   DEFAULT_NSEC = rand(1_000_000_000)
 
-  def msec_from_boot_to_time(msec, uptime: DEFAULT_UPTIME, sec: DEFAULT_TIME, nsec: DEFAULT_NSEC)
+  def msec_from_boot_to_time_by_rational(msec, uptime: DEFAULT_UPTIME, sec: DEFAULT_TIME, nsec: DEFAULT_NSEC)
     current_time = Rational(sec) + Rational(nsec, 1_000_000_000)
     diff_msec = uptime - msec
     target_time = current_time - Rational(diff_msec, 1_000)
     Time.at(target_time)
   end
 
+  def msec_from_boot_to_time(msec, uptime: DEFAULT_UPTIME, sec: DEFAULT_TIME, nsec: DEFAULT_NSEC)
+    millis = uptime - msec
+    seconds = sec - (millis / 1000)
+    micros = (nsec / 1000) - ((millis % 1000) * 1000)
+    if micros < 0
+      seconds -= 1
+      micros += 1000000
+    end
+    Time.at(seconds, micros)
+  end
+
   def format_for_switched(time)
     time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
   end
 
-  test 'switched time logic: it is wrong' do
-    require 'ostruct'
-    # 15:07:30.123456789
-    current_time = Time.at(Rational(Time.parse('2016-02-29 15:07:30 -0800').to_i) + Rational(123_456_789, 1_000_000_000))
-    # 1day 17hours 56minutes 42seconds 827milliseconds
-    uptime = (((1 * 24 + 17) * 60 + 56) * 60 + 42) * 1000 + 827
+  test 'converting msec from boottime to time works correctly' do
+    assert_equal msec_from_boot_to_time(300).to_i, msec_from_boot_to_time_by_rational(300).to_i
+    assert_equal msec_from_boot_to_time(300).usec, msec_from_boot_to_time_by_rational(300).usec
+  end
 
-    flowset = OpenStruct.new
-    flowset.uptime = uptime
-    flowset.unix_sec = current_time.to_i
-    flowset.unix_nsec = current_time.nsec
+  test 'check performance degradation about stringifying *_switched times' do
+    parser = create_parser({"switched_times_from_uptime" => true})
+    data = v5_data(
+      version: 5,
+      flow_records: 50,
+      uptime: DEFAULT_UPTIME,
+      unix_sec: DEFAULT_TIME,
+      unix_nsec: DEFAULT_NSEC,
+      flow_seq_num: 1,
+      engine_type: 1,
+      engine_id: 1,
+      sampling_algorithm: 0,
+      sampling_interval: 0,
+      records: [
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+        v5_record(), v5_record(), v5_record(), v5_record(), v5_record(),
+      ]
+    )
 
-    switched_time = ->(flowset, v){
-      millis = flowset.uptime - v
-      seconds = flowset.unix_sec - (millis / 1000)
-      micros = (flowset.unix_nsec / 1000) - (millis % 1000)
-      if micros < 0
-        seconds -= 1
-        micros += 1000000
+    bench_data = data.to_binary_s # 50 records
+
+    # configure to leave uptime-based value as-is
+    count = 0
+    GC.start
+    t1 = Time.now
+    1000.times do
+      parser.call(bench_data) do |time, record|
+        # do nothing
+        count += 1
       end
-      Time.at(seconds, micros)
-    }
-    s1 = switched_time.(flowset, uptime - 19000) # 19 seconds ago
-    s2 = switched_time.(flowset, uptime - 18500) # 18.5 seconds ago
-    assert_equal 0.5, s2 - s1
+    end
+    t2 = Time.now
+    uptime_based_switched = t2 - t1
+
+    assert{ count == 50000 }
+
+    # make time conversion to use Rational
+    count = 0
+    GC.start
+    t3 = Time.now
+    1000.times do
+      parser.call(bench_data) do |time, record|
+        record["first_switched"] = format_for_switched(msec_from_boot_to_time_by_rational(record["first_switched"]))
+        record["last_switched"] = format_for_switched(msec_from_boot_to_time_by_rational(record["last_switched"]))
+        count += 1
+      end
+    end
+    t4 = Time.now
+    using_rational = t4 - t3
+
+    assert{ count == 50000 }
+
+    # skip time formatting
+    count = 0
+    GC.start
+    t5 = Time.now
+    1000.times do
+      parser.call(bench_data) do |time, record|
+        record["first_switched"] = msec_from_boot_to_time(record["first_switched"])
+        record["last_switched"] = msec_from_boot_to_time(record["last_switched"])
+        count += 1
+      end
+    end
+    t6 = Time.now
+    skip_time_formatting = t6 - t5
+
+    assert{ count == 50000 }
+
+    # with full time conversion (default)
+    parser = create_parser
+    count = 0
+    GC.start
+    t7 = Time.now
+    1000.times do
+      parser.call(bench_data) do |time, record|
+        count += 1
+      end
+    end
+    t8 = Time.now
+    default_formatting = t8 - t7
+
+    assert{ count == 50000 }
+
+    assert{ using_rational > default_formatting }
+    assert{ default_formatting > skip_time_formatting }
+    assert{ skip_time_formatting > uptime_based_switched }
   end
 
   test 'parse v5 binary data contains 1 record, generated from definition' do
@@ -153,6 +239,64 @@ class NetflowParserTest < Test::Unit::TestCase
     assert_equal 1024, event["in_bytes"]
     assert_equal format_for_switched(msec_from_boot_to_time(DEFAULT_UPTIME - 13000)), event["first_switched"]
     assert_equal format_for_switched(msec_from_boot_to_time(DEFAULT_UPTIME - 12950)), event["last_switched"]
+    assert_equal 1048, event["l4_src_port"]
+    assert_equal 80, event["l4_dst_port"]
+    assert_equal 27, event["tcp_flags"]
+    assert_equal 6, event["protocol"]
+    assert_equal 0, event["src_tos"]
+    assert_equal 101, event["src_as"]
+    assert_equal 201, event["dst_as"]
+    assert_equal 24, event["src_mask"]
+    assert_equal 24, event["dst_mask"]
+  end
+
+  test 'parse v5 binary data contains 1 record, generated from definition, leaving switched times as using uptime' do
+    parser = create_parser({"switched_times_from_uptime" => true})
+    parsed = []
+
+    time1 = DEFAULT_TIME
+    data1 = v5_data(
+      version: 5,
+      flow_records: 1,
+      uptime: DEFAULT_UPTIME,
+      unix_sec: DEFAULT_TIME,
+      unix_nsec: DEFAULT_NSEC,
+      flow_seq_num: 1,
+      engine_type: 1,
+      engine_id: 1,
+      sampling_algorithm: 0,
+      sampling_interval: 0,
+      records: [
+        v5_record,
+      ]
+    )
+
+    parser.call(data1.to_binary_s) do |time, record|
+      parsed << [time, record]
+    end
+
+    assert_equal 1, parsed.size
+    assert_equal time1, parsed.first[0]
+
+    event = parsed.first[1]
+
+    assert_equal 5, event["version"]
+    assert_equal 1, event["flow_records"]
+    assert_equal 1, event["flow_seq_num"]
+    assert_equal 1, event["engine_type"]
+    assert_equal 1, event["engine_id"]
+    assert_equal 0, event["sampling_algorithm"]
+    assert_equal 0, event["sampling_interval"]
+
+    assert_equal "10.0.1.122", event["ipv4_src_addr"]
+    assert_equal "192.168.0.3", event["ipv4_dst_addr"]
+    assert_equal "10.0.0.3", event["ipv4_next_hop"]
+    assert_equal 1, event["input_snmp"]
+    assert_equal 2, event["output_snmp"]
+    assert_equal 156, event["in_pkts"]
+    assert_equal 1024, event["in_bytes"]
+    assert_equal (DEFAULT_UPTIME - 13000), event["first_switched"]
+    assert_equal (DEFAULT_UPTIME - 12950), event["last_switched"]
     assert_equal 1048, event["l4_src_port"]
     assert_equal 80, event["l4_dst_port"]
     assert_equal 27, event["tcp_flags"]
