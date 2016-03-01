@@ -13,4 +13,6 @@ matrix:
     - rvm: ruby-head
     - rvm: rbx
 
+before_install: gem update bundler
+
 script: bundle exec rake test
