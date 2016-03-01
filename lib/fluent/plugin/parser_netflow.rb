@@ -12,6 +12,7 @@ module Fluent
     class NetflowParser < Parser
       Plugin.register_parser('netflow', self)
 
+      config_param :switched_times_from_uptime, :bool, default: false
       config_param :cache_ttl, :integer, default: 4000
       config_param :versions, :array, default: [5, 9]
       config_param :definitions, :string, default: nil
@@ -71,6 +72,21 @@ module Fluent
 
       def ipv4_addr_to_string(uint32)
         "#{(uint32 & 0xff000000) >> 24}.#{(uint32 & 0x00ff0000) >> 16}.#{(uint32 & 0x0000ff00) >> 8}.#{uint32 & 0x000000ff}"
+      end
+
+      def msec_from_boot_to_time(msec, uptime, current_unix_time, current_nsec)
+        millis = uptime - msec
+        seconds = current_unix_time - (millis / 1000)
+        micros = (current_nsec / 1000) - ((millis % 1000) * 1000)
+        if micros < 0
+          seconds -= 1
+          micros += 1000000
+        end
+        Time.at(seconds, micros)
+      end
+
+      def format_for_switched(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
       end
 
       NETFLOW_V5_HEADER_FORMAT = 'nnNNNNnn'
@@ -138,6 +154,7 @@ module Fluent
           tcp_flags_16, protocol_src_tos, src_as, dst_as, src_dst_mask = objects.shift(16)
           record = {
             "version" => version,
+            "uptime"  => uptime,
             "flow_records" => flow_records,
             "flow_seq_num" => flow_seq_num,
             "engine_type"  => engine_type,
@@ -178,6 +195,11 @@ module Fluent
             "src_mask" => (src_dst_mask & 0xff00) >> 8,
             "dst_mask" => (src_dst_mask & 0x00ff)
           }
+          unless @switched_times_from_uptime
+            record["first_switched"] = format_for_switched(msec_from_boot_to_time(record["first_switched"], uptime, unix_sec, unix_nsec))
+            record["last_switched"]  = format_for_switched(msec_from_boot_to_time(record["last_switched"] , uptime, unix_sec, unix_nsec))
+          end
+
           block.call(time, record)
         end
       end
