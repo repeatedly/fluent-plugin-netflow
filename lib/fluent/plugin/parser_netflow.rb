@@ -32,16 +32,16 @@ module Fluent
         begin
           @fields = YAML.load_file(filename)
         rescue => e
-          raise "Bad syntax in definitions file #{filename}", error_class: e.class, error: e.message
+          raise ConfigError, "Bad syntax in definitions file #{filename}, error_class = #{e.class.name}, error = #{e.message}"
         end
 
         # Allow the user to augment/override/rename the supported Netflow fields
         if @definitions
-          raise "definitions file #{@definitions} does not exists" unless File.exist?(@definitions)
+          raise ConfigError, "definitions file #{@definitions} does not exists" unless File.exist?(@definitions)
           begin
             @fields.merge!(YAML.load_file(@definitions))
           rescue => e
-            raise "Bad syntax in definitions file #{@definitions}", error_class: e.class, error: e.message
+            raise ConfigError, "Bad syntax in definitions file #{@definitions}, error_class = #{e.class.name}, error = #{e.message}"
           end
         end
         # Path to default Netflow v9 scope field definitions
@@ -50,7 +50,7 @@ module Fluent
         begin
           @scope_fields = YAML.load_file(filename)
         rescue => e
-          raise "Bad syntax in scope definitions file #{filename}", error_class: e.class, error: e.message
+          raise ConfigError, "Bad syntax in scope definitions file #{filename}, error_class = #{e.class.name}, error = #{e.message}"
         end
       end
 
