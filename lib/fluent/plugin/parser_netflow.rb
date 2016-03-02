@@ -27,7 +27,7 @@ module Fluent
 
         @templates = Vash.new()
         # Path to default Netflow v9 field definitions
-        filename = File.expand_path('../netflow_option_fields.yaml', __FILE__)
+        filename = File.expand_path('../netflow_fields.yaml', __FILE__)
 
         begin
           @fields = YAML.load_file(filename)
@@ -39,18 +39,10 @@ module Fluent
         if @definitions
           raise ConfigError, "definitions file #{@definitions} does not exists" unless File.exist?(@definitions)
           begin
-            @fields.merge!(YAML.load_file(@definitions))
+            @fields['option'].merge!(YAML.load_file(@definitions))
           rescue => e
             raise ConfigError, "Bad syntax in definitions file #{@definitions}, error_class = #{e.class.name}, error = #{e.message}"
           end
-        end
-        # Path to default Netflow v9 scope field definitions
-        filename = File.expand_path('../netflow_scope_fields.yaml', __FILE__)
-
-        begin
-          @scope_fields = YAML.load_file(filename)
-        rescue => e
-          raise ConfigError, "Bad syntax in scope definitions file #{filename}, error_class = #{e.class.name}, error = #{e.message}"
         end
       end
 
@@ -210,7 +202,7 @@ module Fluent
           catch (:field) do
             fields = []
             template.fields.each do |field|
-              entry = netflow_field_for(field.field_type, field.field_length, @fields)
+              entry = netflow_field_for(field.field_type, field.field_length)
               if !entry
                 throw :field
               end
@@ -229,20 +221,16 @@ module Fluent
         record.flowset_data.templates.each do |template|
           catch (:field) do
             fields = []
-            template.scope_fields.each do |field|
-              entry = netflow_field_for(field.field_type, field.field_length, @scope_fields)
-              if ! entry
-                throw :field
-              end
-              fields += entry
+
+            ['scope', 'option'].each do |category|
+              template["#{category}_fields"].each do |field|
+                entry = netflow_field_for(field.field_type, field.field_length, category)
+                if ! entry
+                  throw :field
+                end
+                fields += entry
             end
-            template.option_fields.each do |field|
-              entry = netflow_field_for(field.field_type, field.field_length, @fields)
-              if ! entry
-                throw :field
-              end
-              fields += entry
-            end
+
             # We get this far, we have a list of fields
             key = "#{flowset.source_id}|#{template.template_id}"
             @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
@@ -308,9 +296,9 @@ module Fluent
         ("uint" + (((length > 0) ? length : default) * 8).to_s).to_sym
       end
 
-      def netflow_field_for(type, length, field_definitions)
-        if field_definitions.include?(type)
-          field = field_definitions[type]
+      def netflow_field_for(type, length, category='option')
+        if @fields[category].include?(type)
+          field = @fields[category][type]
           if field.is_a?(Array)
 
             if field[0].is_a?(Integer)
