@@ -229,6 +229,7 @@ module Fluent
                   throw :field
                 end
                 fields += entry
+              end
             end
 
             # We get this far, we have a list of fields
