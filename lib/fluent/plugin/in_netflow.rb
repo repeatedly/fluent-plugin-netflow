@@ -69,7 +69,7 @@ module Fluent
     def receive_data(host, data)
       log.on_debug { log.debug "received logs", :host => host, :data => data }
 
-      @parser.call(data) { |time, record|
+      @parser.call(data, host) { |time, record|
         unless time && record
           log.warn "pattern not match: #{data.inspect}"
           return

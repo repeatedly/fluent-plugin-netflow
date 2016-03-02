@@ -47,7 +47,7 @@ module Fluent
         end
       end
 
-      def call(payload, &block)
+      def call(payload, host=nil, &block)
         version,_ = payload[0,2].unpack('n')
         case version
         when 5
@@ -55,7 +55,7 @@ module Fluent
         when 9
           # TODO: implement forV9
           pdu = Netflow9PDU.read(payload)
-          handle_v9(pdu, block)
+          handle_v9(host, pdu, block)
         else
           $log.warn "Unsupported Netflow version v#{version}: #{version.class}"
         end
@@ -183,22 +183,22 @@ module Fluent
         end
       end
 
-      def handle_v9(pdu, block)
+      def handle_v9(host, pdu, block)
         pdu.records.each do |flowset|
           case flowset.flowset_id
           when 0
-            handle_v9_flowset_template(pdu, flowset)
+            handle_v9_flowset_template(host, pdu, flowset)
           when 1
-            handle_v9_flowset_options_template(pdu, flowset)
+            handle_v9_flowset_options_template(host, pdu, flowset)
           when 256..65535
-            handle_v9_flowset_data(pdu, flowset, block)
+            handle_v9_flowset_data(host, pdu, flowset, block)
           else
             $log.warn "Unsupported flowset id #{flowset.flowset_id}"
           end
         end
       end
 
-      def handle_v9_flowset_template(pdu, flowset)
+      def handle_v9_flowset_template(host, pdu, flowset)
         flowset.flowset_data.templates.each do |template|
           catch (:field) do
             fields = []
@@ -209,7 +209,7 @@ module Fluent
               fields += entry
             end
             # We get this far, we have a list of fields
-            key = "#{pdu.source_id}|#{template.template_id}"
+            key = "#{host}|#{pdu.source_id}|#{template.template_id}"
             @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
             # Purge any expired templates
             @templates.cleanup!
@@ -219,7 +219,7 @@ module Fluent
 
       NETFLOW_V9_FIELD_CATEGORIES = ['scope', 'option']
 
-      def handle_v9_flowset_options_template(pdu, flowset)
+      def handle_v9_flowset_options_template(host, pdu, flowset)
         flowset.flowset_data.templates.each do |template|
           catch (:field) do
             fields = []
@@ -234,7 +234,7 @@ module Fluent
             end
 
             # We get this far, we have a list of fields
-            key = "#{pdu.source_id}|#{template.template_id}"
+            key = "#{host}|#{pdu.source_id}|#{template.template_id}"
             @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
             # Purge any expired templates
             @templates.cleanup!
@@ -244,9 +244,9 @@ module Fluent
 
       FIELDS_FOR_COPY_V9 = ['version', 'flow_seq_num']
 
-      def handle_v9_flowset_data(pdu, flowset, block)
-        key = "#{pdu.source_id}|#{flowset.flowset_id}"
-        template = @templates[key]
+      def handle_v9_flowset_data(host, pdu, flowset, block)
+        template_key = "#{host}|#{pdu.source_id}|#{flowset.flowset_id}"
+        template = @templates[template_key]
         if ! template
           $log.warn("No matching template for flow id #{flowset.flowset_id}")
           return
@@ -267,7 +267,8 @@ module Fluent
         fields = array.read(flowset.flowset_data)
         fields.each do |r|
           if is_sampler?(r)
-            register_sampler_v9 r
+            sampler_key = "#{host}|#{pdu.source_id}|#{r.flow_sampler_id}"
+            register_sampler_v9 sampler_key, r
             next
           end
 
@@ -288,9 +289,10 @@ module Fluent
           end
 
           if sampler_id = r['flow_sampler_id']
-            if @samplers_v9[sampler_id]
-              event['sampling_algorithm'] ||= @samplers_v9[sampler_id]['flow_sampler_mode']
-              event['sampling_interval'] ||= @samplers_v9[sampler_id]['flow_sampler_random_interval']
+            sampler_key = "#{host}|#{pdu.source_id}|#{sampler_id}"
+            if sampler = @samplers_v9[sampler_key]
+              event['sampling_algorithm'] ||= sampler['flow_sampler_mode']
+              event['sampling_interval'] ||= sampler['flow_sampler_random_interval']
             end
           end
 
@@ -337,8 +339,8 @@ module Fluent
         record['flow_sampler_id'] && record['flow_sampler_mode'] && record['flow_sampler_random_interval']
       end
 
-      def register_sampler_v9(record)
-        @samplers_v9[record.flow_sampler_id, @cache_ttl] = record
+      def register_sampler_v9(key, sampler)
+        @samplers_v9[key, @cache_ttl] = sampler
         @samplers_v9.cleanup!
       end
     end
