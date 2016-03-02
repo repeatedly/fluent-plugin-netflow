@@ -53,8 +53,8 @@ module Fluent
           forV5(payload, block)
         when 9
           # TODO: implement forV9
-          flowset = Netflow9PDU.read(payload)
-          handle_v9(flowset, block)
+          pdu = Netflow9PDU.read(payload)
+          handle_v9(pdu, block)
         else
           $log.warn "Unsupported Netflow version v#{version}: #{version.class}"
         end
@@ -182,23 +182,23 @@ module Fluent
         end
       end
 
-      def handle_v9(flowset, block)
-        flowset.records.each do |record|
-          case record.flowset_id
+      def handle_v9(pdu, block)
+        pdu.records.each do |flowset|
+          case flowset.flowset_id
           when 0
-            handle_v9_flowset_template(flowset, record)
+            handle_v9_flowset_template(pdu, flowset)
           when 1
-            handle_v9_flowset_options_template(flowset, record)
+            handle_v9_flowset_options_template(pdu, flowset)
           when 256..65535
-            handle_v9_flowset_data(flowset, record, block)
+            handle_v9_flowset_data(pdu, flowset, block)
           else
-            $log.warn "Unsupported flowset id #{record.flowset_id}"
+            $log.warn "Unsupported flowset id #{flowset.flowset_id}"
           end
         end
       end
 
-      def handle_v9_flowset_template(flowset, record)
-        record.flowset_data.templates.each do |template|
+      def handle_v9_flowset_template(pdu, flowset)
+        flowset.flowset_data.templates.each do |template|
           catch (:field) do
             fields = []
             template.fields.each do |field|
@@ -208,7 +208,7 @@ module Fluent
               fields += entry
             end
             # We get this far, we have a list of fields
-            key = "#{flowset.source_id}|#{template.template_id}"
+            key = "#{pdu.source_id}|#{template.template_id}"
             @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
             # Purge any expired templates
             @templates.cleanup!
@@ -218,8 +218,8 @@ module Fluent
 
       NETFLOW_V9_FIELD_CATEGORIES = ['scope', 'option']
 
-      def handle_v9_flowset_options_template(flowset, record)
-        record.flowset_data.templates.each do |template|
+      def handle_v9_flowset_options_template(pdu, flowset)
+        flowset.flowset_data.templates.each do |template|
           catch (:field) do
             fields = []
 
@@ -233,7 +233,7 @@ module Fluent
             end
 
             # We get this far, we have a list of fields
-            key = "#{flowset.source_id}|#{template.template_id}"
+            key = "#{pdu.source_id}|#{template.template_id}"
             @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
             # Purge any expired templates
             @templates.cleanup!
@@ -243,43 +243,43 @@ module Fluent
 
       FIELDS_FOR_COPY_V9 = ['version', 'flow_seq_num']
 
-      def handle_v9_flowset_data(flowset, record, block)
-        key = "#{flowset.source_id}|#{record.flowset_id}"
+      def handle_v9_flowset_data(pdu, flowset, block)
+        key = "#{pdu.source_id}|#{flowset.flowset_id}"
         template = @templates[key]
         if ! template
-          $log.warn("No matching template for flow id #{record.flowset_id}")
+          $log.warn("No matching template for flow id #{flowset.flowset_id}")
           return
         end
 
-        length = record.flowset_length - 4
+        length = flowset.flowset_length - 4
 
-        # Template shouldn't be longer than the record and there should
+        # Template shouldn't be longer than the flowset and there should
         # be at most 3 padding bytes
         if template.num_bytes > length or ! (length % template.num_bytes).between?(0, 3)
           $log.warn "Template length doesn't fit cleanly into flowset",
-                    template_id: record.flowset_id, template_length: template.num_bytes, record_length: length
+                    template_id: flowset.flowset_id, template_length: template.num_bytes, flowset_length: length
           return
         end
 
         array = BinData::Array.new(type: template, initial_length: length / template.num_bytes)
 
-        records = array.read(record.flowset_data)
-        records.each do |r|
-          time = flowset.unix_sec
+        fields = array.read(flowset.flowset_data)
+        fields.each do |r|
+          time = pdu.unix_sec
           event = {}
 
           # Fewer fields in the v9 header
           FIELDS_FOR_COPY_V9.each do |f|
-            event[f] = flowset[f]
+            event[f] = pdu[f]
           end
 
-          event['flowset_id'] = record.flowset_id
+          event['flowset_id'] = flowset.flowset_id
 
           r.each_pair do |k,v|
             case k.to_s
             when /_switched$/
-              millis = flowset.uptime - v
-              seconds = flowset.unix_sec - (millis / 1000)
+              millis = pdu.uptime - v
+              seconds = pdu.unix_sec - (millis / 1000)
               # v9 did away with the nanosecs field
               micros = 1000000 - (millis % 1000)
               event[k.to_s] = Time.at(seconds, micros).utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
