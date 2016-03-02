@@ -26,6 +26,7 @@ module Fluent
         super
 
         @templates = Vash.new()
+        @samplers_v9 = Vash.new()
         # Path to default Netflow v9 field definitions
         filename = File.expand_path('../netflow_fields.yaml', __FILE__)
 
@@ -265,6 +266,11 @@ module Fluent
 
         fields = array.read(flowset.flowset_data)
         fields.each do |r|
+          if is_sampler?(r)
+            register_sampler_v9 r
+            next
+          end
+
           time = pdu.unix_sec  # TODO: Fluent::EventTime (see: forV5)
           event = {}
 
@@ -279,6 +285,13 @@ module Fluent
           unless @switched_times_from_uptime
             event['first_switched'] = format_for_switched(msec_from_boot_to_time(event['first_switched'], pdu.uptime, time, 0))
             event['last_switched']  = format_for_switched(msec_from_boot_to_time(event['last_switched'] , pdu.uptime, time, 0))
+          end
+
+          if sampler_id = r['flow_sampler_id']
+            if @samplers_v9[sampler_id]
+              event['sampling_algorithm'] ||= @samplers_v9[sampler_id]['flow_sampler_mode']
+              event['sampling_interval'] ||= @samplers_v9[sampler_id]['flow_sampler_random_interval']
+            end
           end
 
           block.call(time, event)
@@ -317,6 +330,16 @@ module Fluent
           $log.warn "Unsupported field", type: type, length: length
           nil
         end
+      end
+
+      # covers Netflow v9 and v10 (a.k.a IPFIX)
+      def is_sampler?(record)
+        record['flow_sampler_id'] && record['flow_sampler_mode'] && record['flow_sampler_random_interval']
+      end
+
+      def register_sampler_v9(record)
+        @samplers_v9[record.flow_sampler_id, @cache_ttl] = record
+        @samplers_v9.cleanup!
       end
     end
   end
