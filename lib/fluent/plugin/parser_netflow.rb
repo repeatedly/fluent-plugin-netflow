@@ -265,7 +265,7 @@ module Fluent
 
         fields = array.read(flowset.flowset_data)
         fields.each do |r|
-          time = pdu.unix_sec
+          time = pdu.unix_sec  # TODO: Fluent::EventTime (see: forV5)
           event = {}
 
           # Fewer fields in the v9 header
@@ -275,17 +275,10 @@ module Fluent
 
           event['flowset_id'] = flowset.flowset_id
 
-          r.each_pair do |k,v|
-            case k.to_s
-            when /_switched$/
-              millis = pdu.uptime - v
-              seconds = pdu.unix_sec - (millis / 1000)
-              # v9 did away with the nanosecs field
-              micros = 1000000 - (millis % 1000)
-              event[k.to_s] = Time.at(seconds, micros).utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
-            else
-              event[k.to_s] = v
-            end
+          r.each_pair {|k,v| event[k.to_s] = v }
+          unless @switched_times_from_uptime
+            event['first_switched'] = format_for_switched(msec_from_boot_to_time(event['first_switched'], pdu.uptime, time, 0))
+            event['last_switched']  = format_for_switched(msec_from_boot_to_time(event['last_switched'] , pdu.uptime, time, 0))
           end
 
           block.call(time, event)
