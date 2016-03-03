@@ -216,12 +216,14 @@ module Fluent
         end
       end
 
+      NETFLOW_V9_FIELD_CATEGORIES = ['scope', 'option']
+
       def handle_v9_flowset_options_template(flowset, record)
         record.flowset_data.templates.each do |template|
           catch (:field) do
             fields = []
 
-            ['scope', 'option'].each do |category|
+            NETFLOW_V9_FIELD_CATEGORIES.each do |category|
               template["#{category}_fields"].each do |field|
                 entry = netflow_field_for(field.field_type, field.field_length, category)
                 throw :field unless entry
