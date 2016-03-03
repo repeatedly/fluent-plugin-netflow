@@ -203,9 +203,8 @@ module Fluent
             fields = []
             template.fields.each do |field|
               entry = netflow_field_for(field.field_type, field.field_length)
-              if !entry
-                throw :field
-              end
+              throw :field unless entry
+
               fields += entry
             end
             # We get this far, we have a list of fields
@@ -225,9 +224,8 @@ module Fluent
             ['scope', 'option'].each do |category|
               template["#{category}_fields"].each do |field|
                 entry = netflow_field_for(field.field_type, field.field_length, category)
-                if ! entry
-                  throw :field
-                end
+                throw :field unless entry
+
                 fields += entry
               end
             end
