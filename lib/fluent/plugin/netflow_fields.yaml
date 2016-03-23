@@ -236,6 +236,9 @@ option:
   235:
   - :uint32
   - :egress_vrf_id
+  236:
+  - :string
+  - :vrf_name
 
 scope:
   1:
