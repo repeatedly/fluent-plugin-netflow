@@ -329,8 +329,9 @@ module Fluent
             nil
           end
         else
-          $log.warn "Unsupported field", type: type, length: length
-          nil
+          $log.warn "Unsupported field can not be displayed", type: type, length: length
+
+          [:skip, nil, {length: length}]
         end
       end
 
