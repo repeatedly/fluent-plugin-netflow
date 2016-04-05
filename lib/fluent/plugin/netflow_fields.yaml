@@ -246,13 +246,9 @@ scope:
   - :system
   2:
   - :skip
-  - :interface
   3:
   - :skip
-  - :line_card
   4:
   - :skip
-  - :netflow_cache
   5:
   - :skip
-  - :template
