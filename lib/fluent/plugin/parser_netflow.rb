@@ -306,31 +306,26 @@ module Fluent
       end
 
       def netflow_field_for(type, length, category='option')
-        if @fields[category].include?(type)
-          field = @fields[category][type]
-          if field.is_a?(Array)
-
-            if field[0].is_a?(Integer)
-              field[0] = uint_field(length, field[0])
-            end
-
-            # Small bit of fixup for skip or string field types where the length
-            # is dynamic
-            case field[0]
-            when :skip
-              field += [nil, {length: length}]
-            when :string
-              field += [{length: length, trim_padding: true}]
-            end
-
-            [field]
-          else
-            $log.warn "Definition should be an array", field: field
-            nil
-          end
-        else
+        unless field = @fields[category][type]
           $log.warn "Unsupported field", type: type, length: length
-          nil
+          return
+        end
+
+        unless field.is_a?(Array)
+          $log.warn "Definition should be an array", field: field
+          return
+        end
+
+        # Small bit of fixup for numeric value, :skip or :string field length, which are dynamic
+        case field[0]
+        when Integer
+          [[uint_field(length, field[0]), field[1]]]
+        when :skip
+          [field + [nil, {length: length}]]
+        when :string
+          [field + [{length: length, trim_padding: true}]]
+        else
+          [field]
         end
       end
 

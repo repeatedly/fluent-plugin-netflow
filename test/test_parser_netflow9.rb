@@ -27,6 +27,10 @@ class Netflow9ParserTest < Test::Unit::TestCase
     @raw_sampler_data ||= File.read(File.expand_path('../dump/netflow.v9.sampler.dump', __FILE__))
   end
 
+  def raw_2byte_as_template
+    @raw_2byte_as_template ||= File.read(File.expand_path('../dump/netflow.v9.template.as2.dump', __FILE__))
+  end
+
   DEFAULT_HOST = '127.0.0.1'
 
   test 'parse netflow v9 binary data before loading corresponding template' do
@@ -126,5 +130,19 @@ class Netflow9ParserTest < Test::Unit::TestCase
 
     assert_equal nil, parsed.first[1]['sampling_algorithm']
     assert_equal nil, parsed.first[1]['sampling_interval']
+  end
+
+  test 'parse netflow v9 binary data with templates whose AS field length varies' do
+    parser = create_parser
+
+    parsed = []
+    [raw_2byte_as_template, raw_template].each {|raw| parser.call(raw, DEFAULT_HOST){} }
+    parser.call(raw_data, DEFAULT_HOST) do |time, record|
+      parsed << [time, record]
+    end
+
+    assert_equal 1, parsed.size
+    assert_equal     0, parsed.first[1]['src_as']
+    assert_equal 65000, parsed.first[1]['dst_as']
   end
 end
