@@ -38,7 +38,7 @@ module Fluent
 
         # Allow the user to augment/override/rename the supported Netflow fields
         if @definitions
-          raise ConfigError, "definitions file #{@definitions} does not exists" unless File.exist?(@definitions)
+          raise ConfigError, "definitions file #{@definitions} doesn't exist" unless File.exist?(@definitions)
           begin
             @fields['option'].merge!(YAML.load_file(@definitions))
           rescue => e
