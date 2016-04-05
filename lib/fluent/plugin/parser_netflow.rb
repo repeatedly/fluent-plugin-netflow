@@ -193,7 +193,7 @@ module Fluent
           when 256..65535
             handle_v9_flowset_data(host, pdu, flowset, block)
           else
-            $log.warn "Unsupported flowset id #{flowset.flowset_id}"
+            $log.warn 'Unsupported flowset', flowset_id: flowset.flowset_id
           end
         end
       end
@@ -248,7 +248,8 @@ module Fluent
         template_key = "#{host}|#{pdu.source_id}|#{flowset.flowset_id}"
         template = @templates[template_key]
         if ! template
-          $log.warn("No matching template for flow id #{flowset.flowset_id}")
+          $log.warn 'No matching template for',
+                    host: host, source_id: pdu.source_id, flowset_id: flowset.flowset_id
           return
         end
 
