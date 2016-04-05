@@ -109,6 +109,51 @@ end
 **NOTE:**
 If the plugin receives Netflow v9 from multiple sources, provide ```source_ip_address``` argument to parse correctly.
 
+### Field definition for Netflow v9
+
+Both option and scope fields for Netflow v9 are defined in [YAML](https://www.ietf.org/rfc/rfc3954.txt) where two parameters are described for each field value like:
+
+```yaml
+option:
+  ...
+  4:           # field value
+  - :uint8     # field length
+  - :protocol  # field type
+```
+
+See [RFC3954 document](https://www.ietf.org/rfc/rfc3954.txt) for more details.
+
+When int value specified for field length, the template parser in this plugin will prefer a field length in received template flowset over YAML. The int value in YAML will be used as a default value only when the length in received flowset is invalid.
+
+```yaml
+option:
+  1:
+  - 4          # means :unit32, which is just a default
+  - :in_bytes
+```
+
+When ```:skip``` is described for a field, the template parser will learn the length from received template flowset and skip the field when data flowsets are processed.
+
+```yaml
+option:
+  ...
+  43:
+  - :skip
+```
+
+**NOTE:**
+The definitions don't exactly reflect RFC3954 in order to cover some illegal implementations which export Netflow v9 in bad field length.
+
+```yaml
+   31:
+   - 3  # Some system exports in 4 bytes despite of RFC
+   - :ipv6_flow_label
+   ...
+   48:
+   - 1  # Some system exports in 2 bytes despite of RFC
+   - :flow_sampler_id
+```
+
 ### More speed ?
 
 :bullettrain_side: Try ```switched_times_from_uptime true``` option !
