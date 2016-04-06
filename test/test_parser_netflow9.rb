@@ -15,8 +15,16 @@ class Netflow9ParserTest < Test::Unit::TestCase
     @raw_template ||= File.read(File.expand_path('../dump/netflow.v9.template.dump', __FILE__))
   end
 
+  def raw_mpls_template
+    @raw_mpls_template ||= File.read(File.expand_path('../dump/netflow.v9.mpls-template.dump', __FILE__))
+  end
+
   def raw_data
     @raw_data ||= File.read(File.expand_path('../dump/netflow.v9.dump', __FILE__))
+  end
+
+  def raw_mpls_data
+    @raw_mpls_data ||= File.read(File.expand_path('../dump/netflow.v9.mpls-data.dump', __FILE__))
   end
 
   def raw_sampler_template
@@ -144,5 +152,19 @@ class Netflow9ParserTest < Test::Unit::TestCase
     assert_equal 1, parsed.size
     assert_equal     0, parsed.first[1]['src_as']
     assert_equal 65000, parsed.first[1]['dst_as']
+  end
+
+  test 'parse netflow v9 binary data contains mpls information' do
+    parser = create_parser
+
+    parsed = []
+    [raw_sampler_template, raw_sampler_data, raw_mpls_template].each {|raw| parser.call(raw, DEFAULT_HOST){} }
+    parser.call(raw_mpls_data, DEFAULT_HOST) do |time, record|
+      parsed << [time, record]
+    end
+
+    assert_equal 24002, parsed.first[1]['mpls_label_1']
+    assert_equal '192.168.32.100', parsed.first[1]['ipv4_src_addr']
+    assert_equal '172.16.32.2', parsed.first[1]['ipv4_dst_addr']
   end
 end
