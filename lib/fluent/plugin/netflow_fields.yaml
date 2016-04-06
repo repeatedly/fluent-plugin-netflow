@@ -209,6 +209,27 @@ option:
   72:
   - :mpls_label
   - :mpls_label_3
+  73:
+  - :mpls_label
+  - :mpls_label_4
+  74:
+  - :mpls_label
+  - :mpls_label_5
+  75:
+  - :mpls_label
+  - :mpls_label_6
+  76:
+  - :mpls_label
+  - :mpls_label_7
+  77:
+  - :mpls_label
+  - :mpls_label_8
+  78:
+  - :mpls_label
+  - :mpls_label_9
+  79:
+  - :mpls_label
+  - :mpls_label_10
   80:
   - :mac_addr
   - :in_dst_mac
@@ -246,13 +267,9 @@ scope:
   - :system
   2:
   - :skip
-  - :interface
   3:
   - :skip
-  - :line_card
   4:
   - :skip
-  - :netflow_cache
   5:
   - :skip
-  - :template

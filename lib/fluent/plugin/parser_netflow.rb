@@ -38,7 +38,7 @@ module Fluent
 
         # Allow the user to augment/override/rename the supported Netflow fields
         if @definitions
-          raise ConfigError, "definitions file #{@definitions} does not exists" unless File.exist?(@definitions)
+          raise ConfigError, "definitions file #{@definitions} doesn't exist" unless File.exist?(@definitions)
           begin
             @fields['option'].merge!(YAML.load_file(@definitions))
           rescue => e
@@ -193,7 +193,7 @@ module Fluent
           when 256..65535
             handle_v9_flowset_data(host, pdu, flowset, block)
           else
-            $log.warn "Unsupported flowset id #{flowset.flowset_id}"
+            $log.warn 'Unsupported flowset', flowset_id: flowset.flowset_id
           end
         end
       end
@@ -248,7 +248,8 @@ module Fluent
         template_key = "#{host}|#{pdu.source_id}|#{flowset.flowset_id}"
         template = @templates[template_key]
         if ! template
-          $log.warn("No matching template for flow id #{flowset.flowset_id}")
+          $log.warn 'No matching template for',
+                    host: host, source_id: pdu.source_id, flowset_id: flowset.flowset_id
           return
         end
 
@@ -306,31 +307,26 @@ module Fluent
       end
 
       def netflow_field_for(type, length, category='option')
-        if @fields[category].include?(type)
-          field = @fields[category][type]
-          if field.is_a?(Array)
+        unless field = @fields[category][type]
+          $log.warn "Skip unsupported field", type: type, length: length
+          return [:skip, nil, {length: length}]
+        end
 
-            if field[0].is_a?(Integer)
-              field[0] = uint_field(length, field[0])
-            end
+        unless field.is_a?(Array)
+          $log.warn "Skip non-Array definition", field: field
+          return [:skip, nil, {length: length}]
+        end
 
-            # Small bit of fixup for skip or string field types where the length
-            # is dynamic
-            case field[0]
-            when :skip
-              field += [nil, {length: length}]
-            when :string
-              field += [{length: length, trim_padding: true}]
-            end
-
-            [field]
-          else
-            $log.warn "Definition should be an array", field: field
-            nil
-          end
+        # Small bit of fixup for numeric value, :skip or :string field length, which are dynamic
+        case field[0]
+        when Integer
+          [[uint_field(length, field[0]), field[1]]]
+        when :skip
+          [field + [nil, {length: length}]]
+        when :string
+          [field + [{length: length, trim_padding: true}]]
         else
-          $log.warn "Unsupported field", type: type, length: length
-          nil
+          [field]
         end
       end
 
