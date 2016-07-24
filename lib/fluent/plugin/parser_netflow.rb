@@ -16,6 +16,7 @@ module Fluent
       config_param :cache_ttl, :integer, default: 4000
       config_param :versions, :array, default: [5, 9]
       config_param :definitions, :string, default: nil
+      config_param :switched_times_minus_49_7d, :integer, default: 0
 
       # Cisco NetFlow Export Datagram Format
       # http://www.cisco.com/c/en/us/td/docs/net_mgmt/netflow_collection_engine/3-6/user/guide/format.html
@@ -75,6 +76,22 @@ module Fluent
           seconds -= 1
           micros += 1000000
         end
+
+        # switched times minus 2^32/1000 seconds
+        num = 0
+        loop {
+          if num >= @switched_times_minus_49_7d then
+            break
+          end
+          num += 1
+          seconds -= 4294967
+          micros -= 296000
+          if micros < 0
+            seconds -= 1
+            micros += 1000000
+          end
+        }
+
         Time.at(seconds, micros)
       end
 
