@@ -112,7 +112,7 @@ module Fluent
         array  :templates, read_until: lambda { array.num_bytes == flowset_length - 4 } do
           uint16 :template_id
           uint16 :field_count
-          array  :fields, initial_length: :field_count do
+          array  :netflow_fields, initial_length: :field_count do
             uint16 :field_type
             uint16 :field_length
           end
