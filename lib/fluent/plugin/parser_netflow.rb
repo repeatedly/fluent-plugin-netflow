@@ -31,7 +31,7 @@ module Fluent
         filename = File.expand_path('../netflow_fields.yaml', __FILE__)
 
         begin
-          @fields = YAML.load_file(filename)
+          @template_fields = YAML.load_file(filename)
         rescue => e
           raise ConfigError, "Bad syntax in definitions file #{filename}, error_class = #{e.class.name}, error = #{e.message}"
         end
@@ -40,7 +40,7 @@ module Fluent
         if @definitions
           raise ConfigError, "definitions file #{@definitions} doesn't exist" unless File.exist?(@definitions)
           begin
-            @fields['option'].merge!(YAML.load_file(@definitions))
+            @template_fields['option'].merge!(YAML.load_file(@definitions))
           rescue => e
             raise ConfigError, "Bad syntax in definitions file #{@definitions}, error_class = #{e.class.name}, error = #{e.message}"
           end
@@ -201,16 +201,16 @@ module Fluent
       def handle_v9_flowset_template(host, pdu, flowset)
         flowset.flowset_data.templates.each do |template|
           catch (:field) do
-            fields = []
-            template.fields.each do |field|
+            template_fields = []
+            template.template_fields.each do |field|
               entry = netflow_field_for(field.field_type, field.field_length)
               throw :field unless entry
 
-              fields += entry
+              template_fields += entry
             end
             # We get this far, we have a list of fields
             key = "#{host}|#{pdu.source_id}|#{template.template_id}"
-            @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
+            @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: template_fields)
             # Purge any expired templates
             @templates.cleanup!
           end
@@ -222,20 +222,20 @@ module Fluent
       def handle_v9_flowset_options_template(host, pdu, flowset)
         flowset.flowset_data.templates.each do |template|
           catch (:field) do
-            fields = []
+            template_fields = []
 
             NETFLOW_V9_FIELD_CATEGORIES.each do |category|
               template["#{category}_fields"].each do |field|
                 entry = netflow_field_for(field.field_type, field.field_length, category)
                 throw :field unless entry
 
-                fields += entry
+                template_fields += entry
               end
             end
 
             # We get this far, we have a list of fields
             key = "#{host}|#{pdu.source_id}|#{template.template_id}"
-            @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: fields)
+            @templates[key, @cache_ttl] = BinData::Struct.new(endian: :big, fields: template_fields)
             # Purge any expired templates
             @templates.cleanup!
           end
@@ -265,8 +265,8 @@ module Fluent
 
         array = BinData::Array.new(type: template, initial_length: length / template.num_bytes)
 
-        fields = array.read(flowset.flowset_data)
-        fields.each do |r|
+        template_fields = array.read(flowset.flowset_data)
+        template_fields.each do |r|
           if is_sampler?(r)
             sampler_key = "#{host}|#{pdu.source_id}|#{r.flow_sampler_id}"
             register_sampler_v9 sampler_key, r
@@ -307,7 +307,7 @@ module Fluent
       end
 
       def netflow_field_for(type, length, category='option')
-        unless field = @fields[category][type]
+        unless field = @template_fields[category][type]
           $log.warn "Skip unsupported field", type: type, length: length
           return [:skip, nil, {length: length}]
         end
