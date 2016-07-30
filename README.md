@@ -53,6 +53,11 @@ Netflow versions which are acceptable.
 When set to true, the plugin stores system uptime for ```first_switched``` and ```last_switched``` instead of ISO8601-formatted absolute time.  
 (Defaults: false)
 
+**switched_times_minus_49_7d**
+
+When a PCAP file to convert to NetFlow is older than system bootup time, ```first_switched``` and ```last_switched``` are added multiple of 2^32/1000 seconds (about 49.7days). This option decrease multiple of 2^32/1000 seconds from ```first_switched``` and ```last_switched```.
+(Default: 0)
+
 
 ## Performance Evaluation
 
