@@ -285,8 +285,8 @@ module Fluent
 
           r.each_pair {|k,v| event[k.to_s] = v }
           unless @switched_times_from_uptime
-            event['first_switched'] = format_for_switched(msec_from_boot_to_time(event['first_switched'], pdu.uptime, time, 0))
-            event['last_switched']  = format_for_switched(msec_from_boot_to_time(event['last_switched'] , pdu.uptime, time, 0))
+            event['first_switched'] = format_for_switched(msec_from_boot_to_time(event['first_switched'], pdu.uptime, time, 0)) if event['first_switched']
+            event['last_switched']  = format_for_switched(msec_from_boot_to_time(event['last_switched'], pdu.uptime, time, 0)) if event['last_switched']
           end
 
           if sampler_id = r['flow_sampler_id']
