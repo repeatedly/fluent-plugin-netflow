@@ -251,6 +251,9 @@ option:
   91:
   - :uint8
   - :mpls_prefix_len
+  95:
+  - 4
+  - :app_id
   234:
   - :uint32
   - :ingress_vrf_id
