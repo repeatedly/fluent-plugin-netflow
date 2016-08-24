@@ -82,6 +82,22 @@ module Fluent
         time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
       end
 
+      def format_for_flowSeconds(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S")
+      end
+
+      def format_for_flowMilliSeconds(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+      end
+
+      def format_for_flowMicroSeconds(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%6NZ")
+      end
+
+      def format_for_flowNanoSeconds(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")
+      end
+
       NETFLOW_V5_HEADER_FORMAT = 'nnNNNNnn'
       NETFLOW_V5_HEADER_BYTES  = 24
       NETFLOW_V5_RECORD_FORMAT = 'NNNnnNNNNnnnnnnnxx'
@@ -291,11 +307,9 @@ module Fluent
           end
 
           r.each_pair do |k, v|
-            $log.warn 'k.to_s', k.to_s
             case k.to_s
             when /^flow(?:Start|End)Seconds$/
-              # event[@target][k.to_s] = LogStash::Timestamp.at(v.snapshot).to_iso8601
-              event[k.to_s] = format_for_switched(Time.at(v.snapshot, 0))
+              event[k.to_s] = format_for_flowSeconds(Time.at(v.snapshot, 0))
             when /^flow(?:Start|End)(Milli|Micro|Nano)seconds$/
               divisor =
                 case $1
@@ -316,8 +330,18 @@ module Fluent
                   (v.snapshot % 1_000_000_000) / 1_000
                 end
                 
-              # event[@target][k.to_s] = LogStash::Timestamp.at(v.snapshot.to_f / divisor).to_iso8601
-              event[k.to_s] = format_for_switched(Time.at(v.snapshot / divisor, microseconds))
+              case $1
+              when 'Milli'
+                event[k.to_s] = format_for_flowMilliSeconds(Time.at(v.snapshot / divisor, microseconds))
+              when 'Micro'
+                event[k.to_s] = format_for_flowMicroSeconds(Time.at(v.snapshot / divisor, microseconds))
+              when 'Nano'
+                nanoseconds = v.snapshot % 1_000_000_000
+                time_with_nano = Time.at(v.snapshot / divisor, microseconds)
+                time_with_nano.nsec = nanoseconds
+                event[k.to_s]  = format_for_flowNanoSeconds(time_with_nano) 
+              end
+              
             else
               event[k.to_s] = v.snapshot
             end
