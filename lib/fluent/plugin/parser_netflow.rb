@@ -201,7 +201,6 @@ module Fluent
 
       def handle_v9(host, pdu, block)
         pdu.records.each do |flowset|
-          $log.warn 'flowset', flowset_id: flowset.flowset_id
           case flowset.flowset_id
           when 0
             handle_v9_flowset_template(host, pdu, flowset)
