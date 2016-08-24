@@ -254,6 +254,30 @@ option:
   95:
   - 4
   - :app_id
+  150:
+  - :uint32
+  - :flowStartSeconds
+  151:
+  - :uint32
+  - :flowEndSeconds
+  152:
+  - :uint64
+  - :flowStartMilliseconds
+  153:
+  - :uint64
+  - :flowEndMilliseconds
+  154:
+  - :uint64
+  - :flowStartMicroseconds
+  155:
+  - :uint64
+  - :flowEndMicroseconds
+  156:
+  - :uint64
+  - :flowStartNanoseconds
+  157:
+  - :uint64
+  - :flowEndNanoseconds
   234:
   - :uint32
   - :ingress_vrf_id
