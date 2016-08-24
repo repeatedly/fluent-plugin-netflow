@@ -185,6 +185,7 @@ module Fluent
 
       def handle_v9(host, pdu, block)
         pdu.records.each do |flowset|
+          $log.warn 'flowset', flowset_id: flowset.flowset_id
           case flowset.flowset_id
           when 0
             handle_v9_flowset_template(host, pdu, flowset)
@@ -287,6 +288,39 @@ module Fluent
           unless @switched_times_from_uptime
             event['first_switched'] = format_for_switched(msec_from_boot_to_time(event['first_switched'], pdu.uptime, time, 0)) if event['first_switched']
             event['last_switched']  = format_for_switched(msec_from_boot_to_time(event['last_switched'], pdu.uptime, time, 0)) if event['last_switched']
+          end
+
+          r.each_pair do |k, v|
+            $log.warn 'k.to_s', k.to_s
+            case k.to_s
+            when /^flow(?:Start|End)Seconds$/
+              # event[@target][k.to_s] = LogStash::Timestamp.at(v.snapshot).to_iso8601
+              event[k.to_s] = format_for_switched(Time.at(v.snapshot, 0))
+            when /^flow(?:Start|End)(Milli|Micro|Nano)seconds$/
+              divisor =
+                case $1
+                when 'Milli'
+                  1_000
+                when 'Micro'
+                  1_000_000
+                when 'Nano'
+                  1_000_000_000
+                end
+              microseconds =
+                case $1
+                when 'Milli'
+                  (v.snapshot % 1_000) * 1_000
+                when 'Micro'
+                  (v.snapshot % 1_000_000)
+                when 'Nano'
+                  (v.snapshot % 1_000_000_000) / 1_000
+                end
+                
+              # event[@target][k.to_s] = LogStash::Timestamp.at(v.snapshot.to_f / divisor).to_iso8601
+              event[k.to_s] = format_for_switched(Time.at(v.snapshot / divisor, microseconds))
+            else
+              event[k.to_s] = v.snapshot
+            end
           end
 
           if sampler_id = r['flow_sampler_id']
