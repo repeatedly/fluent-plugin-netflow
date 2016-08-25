@@ -301,14 +301,10 @@ module Fluent
 
           r.each_pair do |k, v|
             case k.to_s
-            when /^first_switched$/
+            when /^(?:first|last)_switched$/
               unless @switched_times_from_uptime
                 event[k.to_s] = format_for_switched(msec_from_boot_to_time(v.snapshot, pdu.uptime, time, 0))
               end
-            when /^last_switched$/
-              unless @switched_times_from_uptime
-                event[k.to_s] = format_for_switched(msec_from_boot_to_time(v.snapshot, pdu.uptime, time, 0))
-              end              
 
             when /^flow(?:Start|End)Seconds$/
               event[k.to_s] = format_for_flowSeconds(Time.at(v.snapshot, 0))
