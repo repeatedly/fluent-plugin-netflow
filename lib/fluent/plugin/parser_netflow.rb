@@ -299,14 +299,17 @@ module Fluent
 
           event['flowset_id'] = flowset.flowset_id
 
-          r.each_pair {|k,v| event[k.to_s] = v }
-          unless @switched_times_from_uptime
-            event['first_switched'] = format_for_switched(msec_from_boot_to_time(event['first_switched'], pdu.uptime, time, 0)) if event['first_switched']
-            event['last_switched']  = format_for_switched(msec_from_boot_to_time(event['last_switched'], pdu.uptime, time, 0)) if event['last_switched']
-          end
-
           r.each_pair do |k, v|
             case k.to_s
+            when /^first_switched$/
+              unless @switched_times_from_uptime
+                event[k.to_s] = format_for_switched(msec_from_boot_to_time(v.snapshot, pdu.uptime, time, 0))
+              end
+            when /^last_switched$/
+              unless @switched_times_from_uptime
+                event[k.to_s] = format_for_switched(msec_from_boot_to_time(v.snapshot, pdu.uptime, time, 0))
+              end              
+
             when /^flow(?:Start|End)Seconds$/
               event[k.to_s] = format_for_flowSeconds(Time.at(v.snapshot, 0))
             when /^flow(?:Start|End)(Milli|Micro|Nano)seconds$/
