@@ -82,6 +82,22 @@ module Fluent
         time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
       end
 
+      def format_for_flowSeconds(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S")
+      end
+
+      def format_for_flowMilliSeconds(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+      end
+
+      def format_for_flowMicroSeconds(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%6NZ")
+      end
+
+      def format_for_flowNanoSeconds(time)
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")
+      end
+
       NETFLOW_V5_HEADER_FORMAT = 'nnNNNNnn'
       NETFLOW_V5_HEADER_BYTES  = 24
       NETFLOW_V5_RECORD_FORMAT = 'NNNnnNNNNnnnnnnnxx'
@@ -283,10 +299,53 @@ module Fluent
 
           event['flowset_id'] = flowset.flowset_id
 
-          r.each_pair {|k,v| event[k.to_s] = v }
-          unless @switched_times_from_uptime
-            event['first_switched'] = format_for_switched(msec_from_boot_to_time(event['first_switched'], pdu.uptime, time, 0)) if event['first_switched']
-            event['last_switched']  = format_for_switched(msec_from_boot_to_time(event['last_switched'], pdu.uptime, time, 0)) if event['last_switched']
+          r.each_pair do |k, v|
+            case k
+            when :first_switched
+              unless @switched_times_from_uptime
+                event[k.to_s] = format_for_switched(msec_from_boot_to_time(v.snapshot, pdu.uptime, time, 0))
+              end
+            when :last_switched
+              unless @switched_times_from_uptime
+                event[k.to_s] = format_for_switched(msec_from_boot_to_time(v.snapshot, pdu.uptime, time, 0))
+              end
+            when :flowStartSeconds
+              event[k.to_s] = format_for_flowSeconds(Time.at(v.snapshot, 0))
+            when :flowEndSeconds
+              event[k.to_s] = format_for_flowSeconds(Time.at(v.snapshot, 0))
+            when :flowStartMilliseconds
+              divisor = 1_000
+              microseconds = (v.snapshot % 1_000) * 1_000
+              event[k.to_s] = format_for_flowMilliSeconds(Time.at(v.snapshot / divisor, microseconds))
+            when :flowEndMilliseconds
+              divisor = 1_000
+              microseconds = (v.snapshot % 1_000) * 1_000
+              event[k.to_s] = format_for_flowMilliSeconds(Time.at(v.snapshot / divisor, microseconds))
+            when :flowStartMicroseconds
+              divisor = 1_000_000
+              microseconds = (v.snapshot % 1_000_000)
+              event[k.to_s] = format_for_flowMicroSeconds(Time.at(v.snapshot / divisor, microseconds))
+            when :flowEndMicroseconds
+              divisor = 1_000_000
+              microseconds = (v.snapshot % 1_000_000)
+              event[k.to_s] = format_for_flowMicroSeconds(Time.at(v.snapshot / divisor, microseconds))
+            when :flowStartNanoseconds
+              divisor = 1_000_000_000
+              microseconds = (v.snapshot % 1_000_000_000) / 1_000
+              nanoseconds = v.snapshot % 1_000_000_000
+              time_with_nano = Time.at(v.snapshot / divisor, microseconds)
+              time_with_nano.nsec = nanoseconds
+              event[k.to_s]  = format_for_flowNanoSeconds(time_with_nano)
+            when :flowEndNanoseconds
+              divisor = 1_000_000_000
+              microseconds = (v.snapshot % 1_000_000_000) / 1_000
+              nanoseconds = v.snapshot % 1_000_000_000
+              time_with_nano = Time.at(v.snapshot / divisor, microseconds)
+              time_with_nano.nsec = nanoseconds
+              event[k.to_s]  = format_for_flowNanoSeconds(time_with_nano)
+            else
+              event[k.to_s] = v.snapshot
+            end
           end
 
           if sampler_id = r['flow_sampler_id']

@@ -15,12 +15,20 @@ class Netflow9ParserTest < Test::Unit::TestCase
     @raw_template ||= File.read(File.expand_path('../dump/netflow.v9.template.dump', __FILE__))
   end
 
+  def raw_flowStartMilliseconds_template
+    @raw_flowStartMilliseconds_template ||= File.read(File.expand_path('../dump/netflow.v9.template.flowStartMilliseconds.dump', __FILE__))
+  end
+
   def raw_mpls_template
     @raw_mpls_template ||= File.read(File.expand_path('../dump/netflow.v9.mpls-template.dump', __FILE__))
   end
 
   def raw_data
     @raw_data ||= File.read(File.expand_path('../dump/netflow.v9.dump', __FILE__))
+  end
+
+  def raw_flowStartMilliseconds_data
+    @raw_flowStartMilliseconds_data ||= File.read(File.expand_path('../dump/netflow.v9.flowStartMilliseconds.dump', __FILE__))
   end
 
   def raw_mpls_data
@@ -91,6 +99,51 @@ class Netflow9ParserTest < Test::Unit::TestCase
       'flow_sampler_id'   => 1,
       'ingress_vrf_id'    => 1610612736,
       'egress_vrf_id'     => 1610612736
+    }
+    assert_equal expected_record, parsed.first[1]
+  end
+
+  test 'parse netflow v9 binary data (flowStartMilliseconds)' do
+    parser = create_parser
+
+    parsed = []
+    parser.call raw_flowStartMilliseconds_template, DEFAULT_HOST
+    parser.call(raw_flowStartMilliseconds_data, DEFAULT_HOST) do |time, record|
+      parsed << [time, record]
+    end
+
+    assert_equal 1, parsed.size
+    assert_equal Time.parse('2016-02-12T04:02:25Z').to_i, parsed.first[0]
+    expected_record = {
+      # header
+      'version'      => 9,
+      'flow_seq_num' => 4645895,
+      'flowset_id'   => 261,
+
+      # flowset
+      'in_pkts'               => 1,
+      'in_bytes'              => 60,
+      'ipv4_src_addr'         => '192.168.0.1',
+      'ipv4_dst_addr'         => '192.168.0.2',
+      'input_snmp'            => 54,
+      'output_snmp'           => 29,
+      'flowEndMilliseconds'   => '2016-02-12T04:02:09.053Z',
+      'flowStartMilliseconds' => '2016-02-12T04:02:09.053Z',
+      'l4_src_port'           => 80,
+      'l4_dst_port'           => 32822,
+      'src_as'                => 0,
+      'dst_as'                => 65000,
+      'bgp_ipv4_next_hop'     => '192.168.0.3',
+      'src_mask'              => 24,
+      'dst_mask'              => 24,
+      'protocol'              => 6,
+      'tcp_flags'             => 0x12,
+      'src_tos'               => 0x0,
+      'direction'             => 0,
+      'forwarding_status'     => 0b01000000,
+      'flow_sampler_id'       => 1,
+      'ingress_vrf_id'        => 1610612736,
+      'egress_vrf_id'         => 1610612736
     }
     assert_equal expected_record, parsed.first[1]
   end
