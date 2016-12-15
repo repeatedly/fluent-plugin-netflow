@@ -43,6 +43,7 @@ module Fluent
     end
 
     def start
+      super
       @loop = Coolio::Loop.new
       @handler = listen(method(:receive_data))
       @loop.attach(@handler)
@@ -55,6 +56,7 @@ module Fluent
       @loop.stop
       @handler.close
       @thread.join
+      super
     end
 
     def run
