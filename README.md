@@ -26,6 +26,7 @@ Use RubyGems:
       port 2055
       cache_ttl 6000
       versions [5, 9]
+      definitions /path/to/custom_fields.yaml
     </source>
 
 **bind**
@@ -52,6 +53,15 @@ Netflow versions which are acceptable.
 
 When set to true, the plugin stores system uptime for ```first_switched``` and ```last_switched``` instead of ISO8601-formatted absolute time.  
 (Defaults: false)
+
+**definitions**
+
+YAML file containing Netflow field definitions to overfide pre-defined templates. Example is like below
+
+    ---
+    4:          # field value
+    - :uint8    # field length
+    - :protocol # field type
 
 
 ## Performance Evaluation
