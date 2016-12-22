@@ -368,12 +368,12 @@ module Fluent
       def netflow_field_for(type, length, category='option')
         unless field = @template_fields[category][type]
           $log.warn "Skip unsupported field", type: type, length: length
-          return [:skip, nil, {length: length}]
+          return [[:skip, nil, {length: length}]]
         end
 
         unless field.is_a?(Array)
           $log.warn "Skip non-Array definition", field: field
-          return [:skip, nil, {length: length}]
+          return [[:skip, nil, {length: length}]]
         end
 
         # Small bit of fixup for numeric value, :skip or :string field length, which are dynamic
