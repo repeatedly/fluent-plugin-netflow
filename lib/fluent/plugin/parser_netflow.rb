@@ -79,23 +79,23 @@ module Fluent
       end
 
       def format_for_switched(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ".freeze)
       end
 
       def format_for_flowSeconds(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S".freeze)
       end
 
       def format_for_flowMilliSeconds(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ".freeze)
       end
 
       def format_for_flowMicroSeconds(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%6NZ")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%6NZ".freeze)
       end
 
       def format_for_flowNanoSeconds(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%9NZ".freeze)
       end
 
       NETFLOW_V5_HEADER_FORMAT = 'nnNNNNnn'
@@ -222,7 +222,7 @@ module Fluent
               entry = netflow_field_for(field.field_type, field.field_length)
               throw :field unless entry
 
-              template_fields += entry
+              template_fields << entry
             end
             # We get this far, we have a list of fields
             key = "#{host}|#{pdu.source_id}|#{template.template_id}"
@@ -245,7 +245,7 @@ module Fluent
                 entry = netflow_field_for(field.field_type, field.field_length, category)
                 throw :field unless entry
 
-                template_fields += entry
+                template_fields << entry
               end
             end
 
@@ -365,7 +365,7 @@ module Fluent
         ("uint" + (((length > 0) ? length : default) * 8).to_s).to_sym
       end
 
-      def netflow_field_for(type, length, category='option')
+      def netflow_field_for(type, length, category = 'option'.freeze)
         unless field = @template_fields[category][type]
           $log.warn "Skip unsupported field", type: type, length: length
           return [:skip, nil, {length: length}]
@@ -379,13 +379,13 @@ module Fluent
         # Small bit of fixup for numeric value, :skip or :string field length, which are dynamic
         case field[0]
         when Integer
-          [[uint_field(length, field[0]), field[1]]]
+          [uint_field(length, field[0]), field[1]]
         when :skip
-          [field + [nil, {length: length}]]
+          field + [nil, {length: length}]
         when :string
-          [field + [{length: length, trim_padding: true}]]
+          field + [{length: length, trim_padding: true}]
         else
-          [field]
+          field
         end
       end
 
