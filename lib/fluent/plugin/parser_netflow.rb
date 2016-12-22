@@ -222,7 +222,7 @@ module Fluent
               entry = netflow_field_for(field.field_type, field.field_length)
               throw :field unless entry
 
-              template_fields += entry
+              template_fields << entry
             end
             # We get this far, we have a list of fields
             key = "#{host}|#{pdu.source_id}|#{template.template_id}"
@@ -245,7 +245,7 @@ module Fluent
                 entry = netflow_field_for(field.field_type, field.field_length, category)
                 throw :field unless entry
 
-                template_fields += entry
+                template_fields << entry
               end
             end
 
@@ -368,24 +368,24 @@ module Fluent
       def netflow_field_for(type, length, category='option')
         unless field = @template_fields[category][type]
           $log.warn "Skip unsupported field", type: type, length: length
-          return [[:skip, nil, {length: length}]]
+          return [:skip, nil, {length: length}]
         end
 
         unless field.is_a?(Array)
           $log.warn "Skip non-Array definition", field: field
-          return [[:skip, nil, {length: length}]]
+          return [:skip, nil, {length: length}]
         end
 
         # Small bit of fixup for numeric value, :skip or :string field length, which are dynamic
         case field[0]
         when Integer
-          [[uint_field(length, field[0]), field[1]]]
+          [uint_field(length, field[0]), field[1]]
         when :skip
-          [field + [nil, {length: length}]]
+          field + [nil, {length: length}]
         when :string
-          [field + [{length: length, trim_padding: true}]]
+          field + [{length: length, trim_padding: true}]
         else
-          [field]
+          field
         end
       end
 
