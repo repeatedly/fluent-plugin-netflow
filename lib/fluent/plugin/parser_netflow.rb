@@ -79,23 +79,23 @@ module Fluent
       end
 
       def format_for_switched(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ".freeze)
       end
 
       def format_for_flowSeconds(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S".freeze)
       end
 
       def format_for_flowMilliSeconds(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ".freeze)
       end
 
       def format_for_flowMicroSeconds(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%6NZ")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%6NZ".freeze)
       end
 
       def format_for_flowNanoSeconds(time)
-        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")
+        time.utc.strftime("%Y-%m-%dT%H:%M:%S.%9NZ".freeze)
       end
 
       NETFLOW_V5_HEADER_FORMAT = 'nnNNNNnn'
@@ -365,7 +365,7 @@ module Fluent
         ("uint" + (((length > 0) ? length : default) * 8).to_s).to_sym
       end
 
-      def netflow_field_for(type, length, category='option')
+      def netflow_field_for(type, length, category = 'option'.freeze)
         unless field = @template_fields[category][type]
           $log.warn "Skip unsupported field", type: type, length: length
           return [:skip, nil, {length: length}]
