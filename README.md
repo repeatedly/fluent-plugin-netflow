@@ -164,6 +164,11 @@ The definitions don't exactly reflect RFC3954 in order to cover some illegal imp
    - :flow_sampler_id
 ```
 
+### PaloAlto Netflow
+
+PaloAlto Netflow has different field definitionas:
+See this definitions for PaloAlto Netflow: https://github.com/repeatedly/fluent-plugin-netflow/issues/27#issuecomment-269197495
+
 ### More speed ?
 
 :bullettrain_side: Try ```switched_times_from_uptime true``` option !
