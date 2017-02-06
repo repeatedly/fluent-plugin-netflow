@@ -16,9 +16,7 @@
 #    limitations under the License.
 #
 
-require 'cool.io'
 require 'fluent/plugin/input'
-require 'fluent/plugin/socket_util'
 require 'fluent/plugin/parser_netflow'
 
 module Fluent::Plugin
