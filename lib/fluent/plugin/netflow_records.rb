@@ -1,7 +1,7 @@
 require "bindata"
 
 module Fluent
-  class TextParser
+  module Plugin
     class NetflowParser < Parser
       class IP4Addr < BinData::Primitive
         endian :big

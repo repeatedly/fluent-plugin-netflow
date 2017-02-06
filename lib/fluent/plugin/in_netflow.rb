@@ -15,13 +15,15 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
+
 require 'cool.io'
+require 'fluent/plugin/input'
 require 'fluent/plugin/socket_util'
 require 'fluent/plugin/parser_netflow'
 
-module Fluent
+module Fluent::Plugin
   class NetflowInput < Input
-    Plugin.register_input('netflow', self)
+    Fluent::Plugin.register_input('netflow', self)
 
     config_param :port, :integer, default: 5140
     config_param :bind, :string, default: '0.0.0.0'
@@ -31,14 +33,14 @@ module Fluent
       when 'udp'
         :udp
       else
-        raise ConfigError, "netflow input protocol type should be 'udp'"
+        raise Fluent::ConfigError, "netflow input protocol type should be 'udp'"
       end
     end
 
     def configure(conf)
       super
 
-      @parser = TextParser::NetflowParser.new
+      @parser = Fluent::Plugin::NetflowParser.new
       @parser.configure(conf)
     end
 

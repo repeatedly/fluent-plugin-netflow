@@ -102,7 +102,7 @@ And configuration:
 ```ruby
 require 'fluent/plugin/parser_netflow'
 
-parser = TextParser::NetflowParser.new
+parser = Fluent::Plugin::NetflowParser.new
 parser.configure(conf)
 
 # Netflow v5

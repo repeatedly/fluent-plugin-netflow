@@ -1,4 +1,5 @@
 require 'helper'
+require 'fluent/test/driver/parser'
 
 class NetflowParserTest < Test::Unit::TestCase
   def setup
@@ -6,7 +7,7 @@ class NetflowParserTest < Test::Unit::TestCase
   end
 
   def create_parser(conf={})
-    parser = Fluent::TextParser::NetflowParser.new
+    parser = Fluent::Plugin::NetflowParser.new
     parser.configure(Fluent::Config::Element.new('ROOT', '', conf, []))
     parser
   end
@@ -310,25 +311,25 @@ class NetflowParserTest < Test::Unit::TestCase
 
   require 'fluent/plugin/netflow_records'
   def ipv4addr(v)
-    addr = Fluent::TextParser::NetflowParser::IP4Addr.new
+    addr = Fluent::Plugin::NetflowParser::IP4Addr.new
     addr.set(v)
     addr
   end
 
   def ipv6addr(v)
-    addr = Fluent::TextParser::NetflowParser::IP6Addr.new
+    addr = Fluent::Plugin::NetflowParser::IP6Addr.new
     addr.set(v)
     addr
   end
 
   def macaddr(v)
-    addr = Fluent::TextParser::NetflowParser::MacAddr.new
+    addr = Fluent::Plugin::NetflowParser::MacAddr.new
     addr.set(v)
     addr
   end
 
   def mplslabel(v)
-    label = Fluent::TextParser::NetflowParser::MplsLabel.new
+    label = Fluent::Plugin::NetflowParser::MplsLabel.new
     label.set(v)
     label
   end
@@ -365,7 +366,7 @@ class NetflowParserTest < Test::Unit::TestCase
       end
       r
     }
-    Fluent::TextParser::NetflowParser::Netflow5PDU.new(hash)
+    Fluent::Plugin::NetflowParser::Netflow5PDU.new(hash)
   end
 
   def v9_template(hash)

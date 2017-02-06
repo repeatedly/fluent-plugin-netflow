@@ -1,16 +1,16 @@
 require "ipaddr"
 require 'yaml'
 
-require 'fluent/parser'
+require 'fluent/plugin/parser'
 
 require_relative 'netflow_records'
 require_relative 'vash'
 
 module Fluent
-  class TextParser
+  module Plugin
     # port from logstash's netflow parser
     class NetflowParser < Parser
-      Plugin.register_parser('netflow', self)
+      Fluent::Plugin.register_parser('netflow', self)
 
       config_param :switched_times_from_uptime, :bool, default: false
       config_param :cache_ttl, :integer, default: 4000
@@ -33,16 +33,16 @@ module Fluent
         begin
           @template_fields = YAML.load_file(filename)
         rescue => e
-          raise ConfigError, "Bad syntax in definitions file #{filename}, error_class = #{e.class.name}, error = #{e.message}"
+          raise Fluent::ConfigError, "Bad syntax in definitions file #{filename}, error_class = #{e.class.name}, error = #{e.message}"
         end
 
         # Allow the user to augment/override/rename the supported Netflow fields
         if @definitions
-          raise ConfigError, "definitions file #{@definitions} doesn't exist" unless File.exist?(@definitions)
+          raise Fluent::ConfigError, "definitions file #{@definitions} doesn't exist" unless File.exist?(@definitions)
           begin
             @template_fields['option'].merge!(YAML.load_file(@definitions))
           rescue => e
-            raise ConfigError, "Bad syntax in definitions file #{@definitions}, error_class = #{e.class.name}, error = #{e.message}"
+            raise Fluent::ConfigError, "Bad syntax in definitions file #{@definitions}, error_class = #{e.class.name}, error = #{e.message}"
           end
         end
       end

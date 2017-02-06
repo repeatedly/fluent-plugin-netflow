@@ -1,5 +1,5 @@
 module Fluent
-  class TextParser
+  module Plugin
     class NetflowParser < Parser
       # https://gist.github.com/joshaven/184837
       class Vash < Hash

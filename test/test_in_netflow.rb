@@ -1,4 +1,5 @@
 require 'helper'
+require 'fluent/test/driver/input'
 
 class NetflowInputTest < Test::Unit::TestCase
   def setup
@@ -13,7 +14,7 @@ class NetflowInputTest < Test::Unit::TestCase
   ]
 
   def create_driver(conf=CONFIG)
-    Fluent::Test::InputTestDriver.new(Fluent::NetflowInput).configure(conf)
+    Fluent::Test::Driver::Input.new(Fluent::Plugin::NetflowInput).configure(conf)
   end
 
   def test_configure

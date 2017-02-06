@@ -6,7 +6,7 @@ class Netflow9ParserTest < Test::Unit::TestCase
   end
 
   def create_parser(conf={})
-    parser = Fluent::TextParser::NetflowParser.new
+    parser = Fluent::Plugin::NetflowParser.new
     parser.configure(Fluent::Config::Element.new('ROOT', '', conf, []))
     parser
   end
