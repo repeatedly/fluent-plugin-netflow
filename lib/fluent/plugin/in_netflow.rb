@@ -25,6 +25,8 @@ module Fluent::Plugin
   class NetflowInput < Input
     Fluent::Plugin.register_input('netflow', self)
 
+    helpers :server
+
     config_param :port, :integer, default: 5140
     config_param :bind, :string, default: '0.0.0.0'
     config_param :tag, :string
@@ -46,26 +48,13 @@ module Fluent::Plugin
 
     def start
       super
-      @loop = Coolio::Loop.new
-      @handler = listen(method(:receive_data))
-      @loop.attach(@handler)
-
-      @thread = Thread.new(&method(:run))
+      server_create(:in_netflow_server, @port, bind: @bind, proto: @protocol_type, max_bytes: 2048) do |data, sock|
+        receive_data(sock.remote_host, data)
+      end
     end
 
     def shutdown
-      @loop.watchers.each { |w| w.detach }
-      @loop.stop
-      @handler.close
-      @thread.join
       super
-    end
-
-    def run
-      @loop.run
-    rescue => e
-      log.error "unexpected error", error_class: e.class, error: e.message
-      log.error_backtrace
     end
 
     protected
@@ -85,35 +74,6 @@ module Fluent::Plugin
     rescue => e
       log.warn "unexpected error on parsing", data: data.dump, error_class: e.class, error: e.message
       log.warn_backtrace
-    end
-
-    private
-
-    def listen(callback)
-      log.info "listening netflow socket on #{@bind}:#{@port} with #{@protocol_type}"
-      if @protocol_type == :udp
-        @usock = SocketUtil.create_udp_socket(@bind)
-        @usock.bind(@bind, @port)
-        UdpHandler.new(@usock, callback)
-      else
-        Coolio::TCPServer.new(@bind, @port, TcpHandler, log, callback)
-      end
-    end
-
-    class UdpHandler < Coolio::IO
-      def initialize(io, callback)
-        super(io)
-        @io = io
-        @callback = callback
-      end
-
-      def on_readable
-        msg, addr = @io.recvfrom_nonblock(4096)
-        @callback.call(addr[3], msg)
-      rescue => e
-        log.error "unexpected error on reading from socket", error_class: e.class, error: e.message
-        log.error_backtrace
-      end
     end
   end
 end
