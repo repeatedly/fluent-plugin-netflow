@@ -36,6 +36,7 @@ module Fluent::Plugin
         raise Fluent::ConfigError, "netflow input protocol type should be 'udp'"
       end
     end
+    config_param :max_bytes, :integer, default: 2048
 
     def configure(conf)
       super
@@ -46,7 +47,7 @@ module Fluent::Plugin
 
     def start
       super
-      server_create(:in_netflow_server, @port, bind: @bind, proto: @protocol_type, max_bytes: 2048) do |data, sock|
+      server_create(:in_netflow_server, @port, bind: @bind, proto: @protocol_type, max_bytes: @max_bytes) do |data, sock|
         receive_data(sock.remote_host, data)
       end
     end

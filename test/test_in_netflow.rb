@@ -23,6 +23,7 @@ class NetflowInputTest < Test::Unit::TestCase
     assert_equal '127.0.0.1', d.instance.bind
     assert_equal 'test.netflow', d.instance.tag
     assert_equal :udp, d.instance.protocol_type
+    assert_equal 2048, d.instance.max_bytes
 
     assert_raise Fluent::ConfigError do
       d = create_driver CONFIG + %[
