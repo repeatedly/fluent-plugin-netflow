@@ -15,13 +15,15 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
-require 'cool.io'
-require 'fluent/plugin/socket_util'
+
+require 'fluent/plugin/input'
 require 'fluent/plugin/parser_netflow'
 
-module Fluent
+module Fluent::Plugin
   class NetflowInput < Input
-    Plugin.register_input('netflow', self)
+    Fluent::Plugin.register_input('netflow', self)
+
+    helpers :server
 
     config_param :port, :integer, default: 5140
     config_param :bind, :string, default: '0.0.0.0'
@@ -31,39 +33,27 @@ module Fluent
       when 'udp'
         :udp
       else
-        raise ConfigError, "netflow input protocol type should be 'udp'"
+        raise Fluent::ConfigError, "netflow input protocol type should be 'udp'"
       end
     end
+    config_param :max_bytes, :integer, default: 2048
 
     def configure(conf)
       super
 
-      @parser = TextParser::NetflowParser.new
+      @parser = Fluent::Plugin::NetflowParser.new
       @parser.configure(conf)
     end
 
     def start
       super
-      @loop = Coolio::Loop.new
-      @handler = listen(method(:receive_data))
-      @loop.attach(@handler)
-
-      @thread = Thread.new(&method(:run))
+      server_create(:in_netflow_server, @port, bind: @bind, proto: @protocol_type, max_bytes: @max_bytes) do |data, sock|
+        receive_data(sock.remote_host, data)
+      end
     end
 
     def shutdown
-      @loop.watchers.each { |w| w.detach }
-      @loop.stop
-      @handler.close
-      @thread.join
       super
-    end
-
-    def run
-      @loop.run
-    rescue => e
-      log.error "unexpected error", error_class: e.class, error: e.message
-      log.error_backtrace
     end
 
     protected
@@ -83,35 +73,6 @@ module Fluent
     rescue => e
       log.warn "unexpected error on parsing", data: data.dump, error_class: e.class, error: e.message
       log.warn_backtrace
-    end
-
-    private
-
-    def listen(callback)
-      log.info "listening netflow socket on #{@bind}:#{@port} with #{@protocol_type}"
-      if @protocol_type == :udp
-        @usock = SocketUtil.create_udp_socket(@bind)
-        @usock.bind(@bind, @port)
-        UdpHandler.new(@usock, callback)
-      else
-        Coolio::TCPServer.new(@bind, @port, TcpHandler, log, callback)
-      end
-    end
-
-    class UdpHandler < Coolio::IO
-      def initialize(io, callback)
-        super(io)
-        @io = io
-        @callback = callback
-      end
-
-      def on_readable
-        msg, addr = @io.recvfrom_nonblock(4096)
-        @callback.call(addr[3], msg)
-      rescue => e
-        log.error "unexpected error on reading from socket", error_class: e.class, error: e.message
-        log.error_backtrace
-      end
     end
   end
 end
