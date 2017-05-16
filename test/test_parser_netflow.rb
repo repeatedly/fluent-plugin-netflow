@@ -219,6 +219,7 @@ class NetflowParserTest < Test::Unit::TestCase
     end
 
     assert_equal 1, parsed.size
+    assert_instance_of Fluent::EventTime, parsed.first[0]
     assert_equal time1, parsed.first[0]
 
     event = parsed.first[1]
