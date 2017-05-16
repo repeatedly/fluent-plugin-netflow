@@ -7,6 +7,13 @@
 
 [Fluentd](http://fluentd.org/) input plugin that acts as Netflow v5/v9 collector.
 
+## Requirements
+
+| fluent-plugin-netflow | fluentd | ruby |
+|------------------------|---------|------|
+| >= 1.0.0 | >= v0.14.0 | >= 2.1 |
+|  < 1.0.0 | >= v0.12.0 | >= 1.9 |
+
 
 ## Installation
 
