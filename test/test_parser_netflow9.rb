@@ -68,6 +68,7 @@ class Netflow9ParserTest < Test::Unit::TestCase
     end
 
     assert_equal 1, parsed.size
+    assert_instance_of Fluent::EventTime, parsed.first[0]
     assert_equal Time.parse('2016-02-12T04:02:25Z').to_i, parsed.first[0]
     expected_record = {
       # header

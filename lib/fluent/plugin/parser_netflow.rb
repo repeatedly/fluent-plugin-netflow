@@ -145,7 +145,7 @@ module Fluent
         sampling_algorithm = (sampling & 0b1100000000000000) >> 14
         sampling_interval = sampling & 0b0011111111111111
 
-        time = Time.at(unix_sec, unix_nsec / 1000).to_i # TODO: Fluent::EventTime
+        time = Fluent::EventTime.new(unix_sec.to_i, unix_nsec.to_i)
 
         records_bytes = payload.bytesize - NETFLOW_V5_HEADER_BYTES
 
@@ -289,7 +289,7 @@ module Fluent
             next
           end
 
-          time = pdu.unix_sec  # TODO: Fluent::EventTime (see: forV5)
+          time = Fluent::EventTime.new(pdu.unix_sec.to_i)
           event = {}
 
           # Fewer fields in the v9 header
