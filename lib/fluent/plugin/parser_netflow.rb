@@ -526,7 +526,7 @@ module Fluent
               end
             end
             $log.warn "Adding event to the list: #{event}"
-            events << event,time
+            events << [event,time]
           end
         else
           $log.warn "Unsupported flowset id #{record.flowset_id}"
