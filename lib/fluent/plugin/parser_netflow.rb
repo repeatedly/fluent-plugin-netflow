@@ -62,7 +62,8 @@ module Fluent
           $log.warn "Yet to implement support for Netflow v#{version}"
           $log.warn "Printing flowset: #{flowset}"
           flowset.records.each do |record|
-          decode_ipfix(flowset, record).each { |event| yield(event) }
+            decode_ipfix(flowset, record).each { |event| yield(event) }
+          end
         else
           $log.warn "Unsupported Netflow version v#{version}: #{version.class}"
         end
