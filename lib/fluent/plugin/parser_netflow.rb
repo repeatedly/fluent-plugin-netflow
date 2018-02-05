@@ -88,7 +88,10 @@ module Fluent
           $log.warn "Yet to implement support for Netflow v#{version}"
           $log.warn "Printing flowset: #{flowset}"
           flowset.records.each do |record|
-            decode_ipfix(flowset, record).each { |event| yield(event) }
+            decode_ipfix(flowset, record).each { |event, time|
+            yield(event, time) 
+            block.call(time, event)
+          }
           end
         else
           $log.warn "Unsupported Netflow version v#{version}: #{version.class}"
@@ -433,7 +436,7 @@ module Fluent
       end
 
       def decode_ipfix(flowset, record)
-        record = []
+        events = []
         $log.warn "Printing flowset_id: #{record.flowset_id}"
         case record.flowset_id
         when 2..3
@@ -482,6 +485,7 @@ module Fluent
           records = array.read(record.flowset_data)
 
           records.each do |r|
+            time = Fluent::EventTime.new(flowset.unix_sec.to_i)
             event = {
               "time" => Fluent::EventTime.new(flowset.unix_sec.to_i),
               @target => {}
@@ -522,7 +526,7 @@ module Fluent
               end
             end
             $log.warn "Adding event to the list: #{event}"
-            record << event
+            events << event, time
           end
         else
           $log.warn "Unsupported flowset id #{record.flowset_id}"
