@@ -483,7 +483,7 @@ module Fluent
 
           records.each do |r|
             event = {
-              time = Fluent::EventTime.new(flowset.unix_sec.to_i),
+              "time" => Fluent::EventTime.new(flowset.unix_sec.to_i),
               @target => {}
             }
 
@@ -498,26 +498,31 @@ module Fluent
             r.each_pair do |k, v|
               case k.to_s
               when /^flow(?:Start|End)Seconds$/
-                event[@target][k.to_s] = LogStash::Timestamp.at(v.snapshot).to_iso8601
+                event[@target][k.to_s] = format_for_flowSeconds(Time.at(v.snapshot, 0))
               when /^flow(?:Start|End)(Milli|Micro|Nano)seconds$/
                 case $1
                 when 'Milli'
-                  event[@target][k.to_s] = LogStash::Timestamp.at(v.snapshot.to_f / 1_000).to_iso8601
-                when 'Micro', 'Nano'
-                  # For now we'll stick to assuming ntp timestamps,
-                  # Netscaler implementation may be buggy though:
-                  # https://bugs.wireshark.org/bugzilla/show_bug.cgi?id=11047
-                  # This only affects the fraction though
-                  ntp_seconds = (v.snapshot >> 32) & 0xFFFFFFFF
-                  ntp_fraction = (v.snapshot & 0xFFFFFFFF).to_f / 2**32
-                  event[@target][k.to_s] = LogStash::Timestamp.at(Time.utc(1900,1,1).to_i + ntp_seconds, ntp_fraction * 1000000).to_iso8601
+                  divisor = 1_000
+                  microseconds = (v.snapshot % 1_000) * 1_000
+                  event[@target][k.to_s] = format_for_flowMilliSeconds(Time.at(v.snapshot / divisor, microseconds))
+                when 'Micro'
+                  divisor = 1_000_000
+                  microseconds = (v.snapshot % 1_000_000)
+                  event[@target][k.to_s] = format_for_flowMicroSeconds(Time.at(v.snapshot / divisor, microseconds))
+                when 'Nano'
+                  divisor = 1_000_000_000
+                  microseconds = (v.snapshot % 1_000_000_000) / 1_000
+                  nanoseconds = v.snapshot % 1_000_000_000
+                  time_with_nano = Time.at(v.snapshot / divisor, microseconds)
+                  time_with_nano.nsec = nanoseconds
+                  event[@target][k.to_s]  = format_for_flowNanoSeconds(time_with_nano)
                 end
               else
                 event[@target][k.to_s] = v.snapshot
               end
             end
 
-            events << LogStash::Event.new(event)
+            events << event
           end
         else
           $log.warn "Unsupported flowset id #{record.flowset_id}"
