@@ -17,11 +17,11 @@
 #
 
 require 'fluent/plugin/input'
-require 'fluent/plugin/parser_netflow'
+require './parser_netflow'
 
 module Fluent::Plugin
   class NetflowInput < Input
-    Fluent::Plugin.register_input('netflow', self)
+    Fluent::Plugin.register_input('netflow_ipfix', self)
 
     helpers :server
 
