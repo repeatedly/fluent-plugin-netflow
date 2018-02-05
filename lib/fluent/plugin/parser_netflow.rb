@@ -433,7 +433,7 @@ module Fluent
       end
 
       def decode_ipfix(flowset, record)
-        events = []
+        record = []
         $log.warn "Printing flowset_id: #{record.flowset_id}"
         case record.flowset_id
         when 2..3
@@ -521,8 +521,8 @@ module Fluent
                 event[@target][k.to_s] = v.snapshot
               end
             end
-
-            events << event
+            $log.warn "Adding event to the list: #{event}"
+            record << event
           end
         else
           $log.warn "Unsupported flowset id #{record.flowset_id}"
