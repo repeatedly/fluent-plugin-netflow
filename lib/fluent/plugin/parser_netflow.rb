@@ -56,6 +56,10 @@ module Fluent
           # TODO: implement forV9
           pdu = Netflow9PDU.read(payload)
           handle_v9(host, pdu, block)
+        when 10 
+          flowset = IpfixPDU.read(payload)
+          $log.warn "Yet to implement support for Netflow v#{version}"
+          $log.warn "Printing flowset: #{flowset}"
         else
           $log.warn "Unsupported Netflow version v#{version}: #{version.class}"
         end

@@ -50,6 +50,186 @@ module Fluent
         def get
           self.bytes.collect { |byte| byte.value.to_s(16).rjust(2,'0') }.join(":")
         end
+      end 
+
+
+      class VarSkip < BinData::Primitive
+        endian :big
+        uint8 :length_1
+        uint16 :length_2, :onlyif => lambda { length_1 == 255 }
+        skip :length => lambda { (length_1 == 255) ? length_2 : length_1 }
+
+        def get
+          ""
+        end
+      end
+
+      class VarString < BinData::Primitive
+        endian :big
+        uint8 :length_1
+        uint16 :length_2, :onlyif => lambda { length_1 == 255 }
+        string :data, :trim_padding => true, :length => lambda { (length_1 == 255) ? length_2 : length_1 }
+
+        def set(val)
+          self.data = val
+        end
+
+        def get
+          self.data
+        end
+
+        def snapshot
+          super.encode("ASCII-8BIT", "UTF-8", invalid: :replace, undef: :replace)
+        end
+      end
+
+      class ACLIdASA < BinData::Primitive
+        string :bytes, :length => 12
+
+        def set(val)
+          unless val.nil?
+            self.bytes = val.split("-").collect { |aclid| aclid.scan(/../).collect { |hex| hex.to_i(16)} }.flatten
+          end
+        end
+
+        def get
+          # This is currently the fastest implementation
+          # For benchmarks see spec/codecs/benchmarks/ACLIdASA.rb
+          b = self.bytes.unpack('H*')[0]
+          b[0..7] + "-" + b[8..15] + "-" + b[16..23] 
+        end
+      end
+
+      class MPLSLabelStackOctets < BinData::Record
+        endian :big
+        bit20  :label
+        bit3   :experimental
+        bit1   :bottom_of_stack
+        uint8  :ttl
+      end
+
+      class Forwarding_Status < BinData::Record
+        endian :big
+        bit2   :status
+        bit6   :reason
+      end
+
+      class Application_Id16 < BinData::Primitive
+        endian :big
+        uint8  :classification_id
+        uint24 :selector_id
+
+        def set(val)
+          unless val.nil?
+            self.classification_id=val.to_i<<24
+            self.selector_id = val.to_i-((val.to_i>>24)<<24)
+          end
+        end
+
+        def get
+          self.classification_id.to_s + ":" + self.selector_id.to_s
+        end
+      end
+
+      class Application_Id24 < BinData::Primitive
+        endian :big
+        uint8  :classification_id
+        uint16 :selector_id
+
+        def set(val)
+          unless val.nil?
+            self.classification_id=val.to_i<<16
+            self.selector_id = val.to_i-((val.to_i>>16)<<16)
+          end
+        end
+
+        def get
+          self.classification_id.to_s + ":" + self.selector_id.to_s
+        end
+      end
+
+      class Application_Id32 < BinData::Primitive
+        endian :big
+        uint8  :classification_id
+        uint24 :selector_id
+
+        def set(val)
+          unless val.nil?
+            self.classification_id=val.to_i<<24
+            self.selector_id = val.to_i-((val.to_i>>24)<<24)
+          end
+        end
+
+        def get
+          self.classification_id.to_s + ":" + self.selector_id.to_s
+        end
+      end
+
+      class Application_Id40 < BinData::Primitive
+        endian :big
+        uint8  :classification_id
+        uint32 :selector_id
+
+        def set(val)
+          unless val.nil?
+            self.classification_id=val.to_i<<32
+            self.selector_id = val.to_i-((val.to_i>>32)<<32)
+          end
+        end
+
+        def get
+          self.classification_id.to_s + ":" + self.selector_id.to_s
+        end
+      end
+
+      class Application_Id64 < BinData::Primitive
+        endian :big
+        uint8  :classification_id
+        uint56 :selector_id
+
+        def set(val)
+          unless val.nil?
+            self.classification_id=val.to_i<<56
+            self.selector_id = val.to_i-((val.to_i>>56)<<56)
+          end
+        end
+
+        def get
+          self.classification_id.to_s + ":" + self.selector_id.to_s
+        end
+      end
+
+      class Application_Id72 < BinData::Primitive
+        endian :big
+        uint8  :classification_id
+        uint64 :selector_id
+
+        def set(val)
+          unless val.nil?
+            self.classification_id=val.to_i<<64
+            self.selector_id = val.to_i-((val.to_i>>64)<<64)
+          end
+        end
+
+        def get
+          self.classification_id.to_s + ":" + self.selector_id.to_s
+        end
+      end
+
+      class OctetArray < BinData::Primitive
+        # arg_processor :octetarray
+        mandatory_parameter :initial_length
+        array :bytes, :type => :uint8, :initial_length => :initial_length
+
+        def set(val)
+          unless val.nil?
+            self.bytes = val.scan(/../).collect { |hex| hex.to_i(16)}
+          end
+        end
+
+        def get
+          self.bytes.collect { |byte| byte.value.to_s(16).rjust(2,'0') }.join
+        end
       end
 
       class MplsLabel < BinData::Primitive
@@ -152,6 +332,60 @@ module Fluent
             template_flowset 0
             option_flowset   1
             string           :default, read_length: lambda { flowset_length - 4 }
+          end
+        end
+      end
+
+      class IpfixTemplateFlowset < BinData::Record
+        endian :big
+        array  :templates, :read_until => lambda { flowset_length - 4 - array.num_bytes <= 2 } do
+          uint16 :template_id
+          uint16 :field_count
+          array  :record_fields, :initial_length => :field_count do
+            bit1   :enterprise
+            bit15  :field_type
+            uint16 :field_length
+            uint32 :enterprise_id, :onlyif => lambda { enterprise != 0 }
+          end
+        end
+        # skip :length => lambda { flowset_length - 4 - set.num_bytes } ?
+      end
+
+      class IpfixOptionFlowset < BinData::Record
+        endian :big
+        array  :templates, :read_until => lambda { flowset_length - 4 - array.num_bytes <= 2 } do
+          uint16 :template_id
+          uint16 :field_count
+          uint16 :scope_count, :assert => lambda { scope_count > 0 }
+          array  :scope_fields, :initial_length => lambda { scope_count } do
+            bit1   :enterprise
+            bit15  :field_type
+            uint16 :field_length
+            uint32 :enterprise_id, :onlyif => lambda { enterprise != 0 }
+          end
+          array  :option_fields, :initial_length => lambda { field_count - scope_count } do
+            bit1   :enterprise
+            bit15  :field_type
+            uint16 :field_length
+            uint32 :enterprise_id, :onlyif => lambda { enterprise != 0 }
+          end
+        end
+      end
+
+      class IpfixPDU < BinData::Record
+        endian :big
+        uint16 :version
+        uint16 :pdu_length
+        uint32 :unix_sec
+        uint32 :flow_seq_num
+        uint32 :observation_domain_id
+        array  :records, :read_until => lambda { array.num_bytes == pdu_length - 16 } do
+          uint16 :flowset_id, :assert => lambda { [2, 3, *(256..65535)].include?(flowset_id) }
+          uint16 :flowset_length, :assert => lambda { flowset_length > 4 }
+          choice :flowset_data, :selection => :flowset_id do
+            ipfix_template_flowset 2
+            ipfix_option_flowset   3
+            string                 :default, :read_length => lambda { flowset_length - 4 }
           end
         end
       end
