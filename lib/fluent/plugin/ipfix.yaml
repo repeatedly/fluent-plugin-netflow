@@ -3612,3 +3612,37 @@
   4321:
   - :uint64
   - :viptelaVPNId
+
+44619:
+  257:
+  - :skip
+  258:
+  - :uint32
+  - :zPid
+  259:
+  - :uint32
+  - :zParentPid
+  261:
+  - :string
+  - :zImagePath
+  279:
+  - :string
+  - :zFileSignature
+  264:
+  - :string
+  - :zPlatform
+  266:
+  - :string
+  - :zAgentGuid
+  267:
+  - :string
+  - :zHostname
+  269:
+  - :string
+  - :zVerCompanyName
+  283:
+  - :string
+  - :zFileSigAlgoChar
+  301:
+  - :string
+  - :zCommandName
