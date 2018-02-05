@@ -525,7 +525,45 @@ module Fluent
         events
       rescue BinData::ValidityError => e
         $log.warn "Invalid IPFIX packet received (#{e})"
-      end
+      end # end decode_ipfix
+
+      def ipfix_field_for(type, enterprise, length)
+        if @ipfix_fields.include?(enterprise)
+          if @ipfix_fields[enterprise].include?(type)
+            field = @ipfix_fields[enterprise][type].clone
+          else
+            @logger.warn("Unsupported enterprise field", :type => type, :enterprise => enterprise, :length => length)
+          end
+        else
+          @logger.warn("Unsupported enterprise", :enterprise => enterprise)
+        end
+
+        return nil unless field
+
+        if field.is_a?(Array)
+          case field[0]
+          when :skip
+            field = skip_field(field, type, length.to_i)
+          when :string
+            field = string_field(field, type, length.to_i)
+          when :octetarray
+            field[0] = :OctetArray
+            field += [{:initial_length => length.to_i}]
+          when :uint64
+            field[0] = uint_field(length, 8)
+          when :uint32
+            field[0] = uint_field(length, 4)
+          when :uint16
+            field[0] = uint_field(length, 2)
+          end
+
+          @logger.debug("Definition complete", :field => field)
+          [field]
+        else
+          @logger.warn("Definition should be an array", :field => field)
+        end
+      end # end def ipfix_field_for
+
     end
   end
 end
