@@ -558,10 +558,10 @@ module Fluent
             field[0] = uint_field(length, 2)
           end
 
-          @logger.debug("Definition complete", :field => field)
+          $log.debug("Definition complete", :field => field)
           [field]
         else
-          @$log.warn("Definition should be an array", :field => field)
+          $log.warn("Definition should be an array", :field => field)
         end
       end # end def ipfix_field_for
 
