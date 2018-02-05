@@ -89,8 +89,8 @@ module Fluent
           $log.warn "Printing flowset: #{flowset}"
           flowset.records.each do |record|
             decode_ipfix(flowset, record).each { |event, time|
-            yield(event, time) 
-            block.call(time, event)
+            yield(time, event) 
+            # block.call(time, event)
           }
           end
         else
@@ -526,7 +526,7 @@ module Fluent
               end
             end
             $log.warn "Adding event to the list: #{event}"
-            events << event, time
+            events << event,time
           end
         else
           $log.warn "Unsupported flowset id #{record.flowset_id}"
