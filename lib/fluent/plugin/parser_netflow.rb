@@ -574,6 +574,25 @@ module Fluent
         end
       end # end def ipfix_field_for
 
+      def skip_field(field, type, length)
+        if length == 65535
+          field[0] = :VarSkip
+        else
+          field += [nil, {:length => length.to_i}]
+        end
+        field
+      end # def skip_field
+
+      def string_field(field, type, length)
+        if length == 65535
+          field[0] = :VarString
+        else
+          field[0] = :string
+          field += [{ :length => length.to_i, :trim_padding => true }]
+        end
+        field
+      end # def string_field
+
     end
   end
 end
