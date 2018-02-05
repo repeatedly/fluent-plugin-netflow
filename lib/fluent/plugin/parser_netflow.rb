@@ -16,15 +16,7 @@ module Fluent
       config_param :cache_ttl, :integer, default: 4000
       config_param :versions, :array, default: [5, 9]
       config_param :definitions, :string, default: nil
-      IPFIX_FIELDS = ['version']
-
-      def initialize(params = {})
-        @file_cache_mutex = Mutex.new
-        super(params)
-        @threadsafe = true
-        @decode_mutex_netflow = Mutex.new
-        @decode_mutex_ipfix = Mutex.new
-      end     
+      IPFIX_FIELDS = ['version']  
 
       # Cisco NetFlow Export Datagram Format
       # http://www.cisco.com/c/en/us/td/docs/net_mgmt/netflow_collection_engine/3-6/user/guide/format.html
@@ -32,6 +24,10 @@ module Fluent
       # http://www.cisco.com/en/US/technologies/tk648/tk362/technologies_white_paper09186a00800a3db9.html
 
       def configure(conf)
+        @file_cache_mutex = Mutex.new
+        @threadsafe = true
+        @decode_mutex_netflow = Mutex.new
+        @decode_mutex_ipfix = Mutex.new
         super
 
         @templates = Vash.new()
