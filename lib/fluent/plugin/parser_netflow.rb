@@ -455,6 +455,7 @@ module Fluent
               end
               # FIXME Source IP address required in key
               key = "#{flowset.observation_domain_id}|#{template.template_id}"
+              $log.warn "Key is : #{key}"
               # Prevent ipfix_templates array from being concurrently modified
               @decode_mutex_ipfix.synchronize do
                 @ipfix_templates[key, @cache_ttl] = BinData::Struct.new(:endian => :big, :fields => fields)
@@ -532,10 +533,10 @@ module Fluent
           if @ipfix_fields[enterprise].include?(type)
             field = @ipfix_fields[enterprise][type].clone
           else
-            @logger.warn("Unsupported enterprise field", :type => type, :enterprise => enterprise, :length => length)
+           $log.warn("Unsupported enterprise field", :type => type, :enterprise => enterprise, :length => length)
           end
         else
-          @logger.warn("Unsupported enterprise", :enterprise => enterprise)
+          $log.warn("Unsupported enterprise", :enterprise => enterprise)
         end
 
         return nil unless field
@@ -560,7 +561,7 @@ module Fluent
           @logger.debug("Definition complete", :field => field)
           [field]
         else
-          @logger.warn("Definition should be an array", :field => field)
+          @$log.warn("Definition should be an array", :field => field)
         end
       end # end def ipfix_field_for
 
