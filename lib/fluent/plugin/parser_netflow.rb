@@ -56,7 +56,6 @@ module Fluent
       end
 
       def load_definitions(defaults, extra)
-        $log.warn "Loading definitions from #{defaults}, #{extra}"
         begin
           fields = YAML.load_file(defaults)
         rescue Exception => e
@@ -72,7 +71,6 @@ module Fluent
             raise "#{self.class.name}: Bad syntax in definitions file #{extra}"
           end
         end
-        $log.warn "Returning fields are #{fields}"
         fields
       end
 
@@ -439,6 +437,7 @@ module Fluent
         $log.warn "Printing flowset_id: #{record.flowset_id}"
         case record.flowset_id
         when 2..3
+          $log.warn "Decoding template set or option template set #{record.flowset_id}"
           record.flowset_data.templates.each do |template|
             catch (:field) do
               fields = []
@@ -471,6 +470,7 @@ module Fluent
         when 256..65535
           # Data flowset
           key = "#{flowset.observation_domain_id}|#{record.flowset_id}"
+          $log.warn "Decoding dataset with Domain id: #{flowset.observation_domain_id} and flow set id: #{record.flowset_id} "
           if @ipfix_templates[key] != nil
             template = @ipfix_templates[key]
           else
@@ -483,7 +483,7 @@ module Fluent
 
           records.each do |r|
             event = {
-              LogStash::Event::TIMESTAMP => LogStash::Timestamp.at(flowset.unix_sec),
+              time = Fluent::EventTime.new(flowset.unix_sec.to_i),
               @target => {}
             }
 
