@@ -18,6 +18,14 @@ module Fluent
       config_param :definitions, :string, default: nil
       IPFIX_FIELDS = ['version']
 
+      def initialize(params = {})
+        @file_cache_mutex = Mutex.new
+        super(params)
+        @threadsafe = true
+        @decode_mutex_netflow = Mutex.new
+        @decode_mutex_ipfix = Mutex.new
+      end     
+
       # Cisco NetFlow Export Datagram Format
       # http://www.cisco.com/c/en/us/td/docs/net_mgmt/netflow_collection_engine/3-6/user/guide/format.html
       # Cisco NetFlow Version 9 Flow-Record Format
@@ -28,15 +36,18 @@ module Fluent
 
         @templates = Vash.new()
         @samplers_v9 = Vash.new()
+        @ipfix_templates = Vash.new()
         # Path to default Netflow v9 field definitions
         filename = File.expand_path('../netflow_fields.yaml', __FILE__)
 
         begin
+          # netflow_fields
           @template_fields = YAML.load_file(filename)
         rescue => e
           raise Fluent::ConfigError, "Bad syntax in definitions file #{filename}, error_class = #{e.class.name}, error = #{e.message}"
         end
-
+        filename = File.expand_path('../ipfix.yaml', __FILE__)
+        @ipfix_fields = load_definitions(filename, @ipfix_definitions)
         # Allow the user to augment/override/rename the supported Netflow fields
         if @definitions
           raise Fluent::ConfigError, "definitions file #{@definitions} doesn't exist" unless File.exist?(@definitions)
@@ -46,6 +57,26 @@ module Fluent
             raise Fluent::ConfigError, "Bad syntax in definitions file #{@definitions}, error_class = #{e.class.name}, error = #{e.message}"
           end
         end
+      end
+
+      def load_definitions(defaults, extra)
+        begin
+          fields = YAML.load_file(defaults)
+        rescue Exception => e
+          raise "#{self.class.name}: Bad syntax in definitions file #{defaults}"
+        end
+
+        # Allow the user to augment/override/rename the default fields
+        if extra
+          raise "#{self.class.name}: definitions file #{extra} does not exist" unless File.exists?(extra)
+          begin
+            fields.merge!(YAML.load_file(extra))
+          rescue Exception => e
+            raise "#{self.class.name}: Bad syntax in definitions file #{extra}"
+          end
+        end
+
+        fields
       end
 
       def call(payload, host=nil, &block)
