@@ -21,7 +21,7 @@ require './parser_netflow'
 
 module Fluent::Plugin
   class NetflowInput < Input
-    Fluent::Plugin.register_input('netflow_ipfix', self)
+    Fluent::Plugin.register_input('netflow', self)
 
     helpers :server
 

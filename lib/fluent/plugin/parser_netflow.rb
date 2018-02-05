@@ -16,6 +16,7 @@ module Fluent
       config_param :cache_ttl, :integer, default: 4000
       config_param :versions, :array, default: [5, 9]
       config_param :definitions, :string, default: nil
+      IPFIX_FIELDS = ['version']
 
       # Cisco NetFlow Export Datagram Format
       # http://www.cisco.com/c/en/us/td/docs/net_mgmt/netflow_collection_engine/3-6/user/guide/format.html
@@ -391,8 +392,7 @@ module Fluent
         else
           field
         end
-      end
-
+      end     
       # covers Netflow v9 and v10 (a.k.a IPFIX)
       def is_sampler?(record)
         record['flow_sampler_id'] && record['flow_sampler_mode'] && record['flow_sampler_random_interval']
@@ -401,6 +401,99 @@ module Fluent
       def register_sampler_v9(key, sampler)
         @samplers_v9[key, @cache_ttl] = sampler
         @samplers_v9.cleanup!
+      end
+
+      def decode_ipfix(flowset, record)
+        events = []
+        $log.warn "Printing flowset_id: #{record.flowset_id}"
+        case record.flowset_id
+        when 2..3
+          record.flowset_data.templates.each do |template|
+            catch (:field) do
+              fields = []
+              # Template flowset (2) or Options template flowset (3) ?
+              template_fields = (record.flowset_id == 2) ? template.record_fields : (template.scope_fields.to_ary + template.option_fields.to_ary)
+              template_fields.each do |field|
+                field_type = field.field_type
+                field_length = field.field_length
+                enterprise_id = field.enterprise ? field.enterprise_id : 0
+
+                entry = ipfix_field_for(field_type, enterprise_id, field.field_length)
+                throw :field unless entry
+                fields += entry
+              end
+              # FIXME Source IP address required in key
+              key = "#{flowset.observation_domain_id}|#{template.template_id}"
+              # Prevent ipfix_templates array from being concurrently modified
+              @decode_mutex_ipfix.synchronize do
+                @ipfix_templates[key, @cache_ttl] = BinData::Struct.new(:endian => :big, :fields => fields)
+                # Purge any expired templates
+                @ipfix_templates.cleanup!
+                if @cache_save_path
+                  @ipfix_templates_cache[key] = fields
+                  save_templates_cache(@ipfix_templates_cache, "#{@cache_save_path}/ipfix_templates.cache")
+                end
+              end
+            end
+          end
+        when 256..65535
+          # Data flowset
+          key = "#{flowset.observation_domain_id}|#{record.flowset_id}"
+          if @ipfix_templates[key] != nil
+            template = @ipfix_templates[key]
+          else
+            @logger.warn("Can't (yet) decode flowset id #{record.flowset_id} from observation domain id #{flowset.observation_domain_id}, because no template to decode it with has been received. This message will usually go away after 1 minute.")
+            return events
+          end
+
+          array = BinData::Array.new(:type => template, :read_until => :eof)
+          records = array.read(record.flowset_data)
+
+          records.each do |r|
+            event = {
+              LogStash::Event::TIMESTAMP => LogStash::Timestamp.at(flowset.unix_sec),
+              @target => {}
+            }
+
+            IPFIX_FIELDS.each do |f|
+              event[@target][f] = flowset[f].snapshot
+            end
+
+            if @include_flowset_id
+              event[@target][FLOWSET_ID] = record.flowset_id.snapshot
+            end
+
+            r.each_pair do |k, v|
+              case k.to_s
+              when /^flow(?:Start|End)Seconds$/
+                event[@target][k.to_s] = LogStash::Timestamp.at(v.snapshot).to_iso8601
+              when /^flow(?:Start|End)(Milli|Micro|Nano)seconds$/
+                case $1
+                when 'Milli'
+                  event[@target][k.to_s] = LogStash::Timestamp.at(v.snapshot.to_f / 1_000).to_iso8601
+                when 'Micro', 'Nano'
+                  # For now we'll stick to assuming ntp timestamps,
+                  # Netscaler implementation may be buggy though:
+                  # https://bugs.wireshark.org/bugzilla/show_bug.cgi?id=11047
+                  # This only affects the fraction though
+                  ntp_seconds = (v.snapshot >> 32) & 0xFFFFFFFF
+                  ntp_fraction = (v.snapshot & 0xFFFFFFFF).to_f / 2**32
+                  event[@target][k.to_s] = LogStash::Timestamp.at(Time.utc(1900,1,1).to_i + ntp_seconds, ntp_fraction * 1000000).to_iso8601
+                end
+              else
+                event[@target][k.to_s] = v.snapshot
+              end
+            end
+
+            events << LogStash::Event.new(event)
+          end
+        else
+          @logger.warn("Unsupported flowset id #{record.flowset_id}")
+        end
+
+        events
+      rescue BinData::ValidityError => e
+        @logger.warn("Invalid IPFIX packet received (#{e})")
       end
     end
   end
