@@ -56,6 +56,7 @@ module Fluent
       end
 
       def load_definitions(defaults, extra)
+        $log.warn "Loading definitions from #{defaults}, #{extra}"
         begin
           fields = YAML.load_file(defaults)
         rescue Exception => e
@@ -71,7 +72,7 @@ module Fluent
             raise "#{self.class.name}: Bad syntax in definitions file #{extra}"
           end
         end
-
+        $log.warn "Returning fields are #{fields}"
         fields
       end
 
@@ -472,7 +473,7 @@ module Fluent
           if @ipfix_templates[key] != nil
             template = @ipfix_templates[key]
           else
-            @logger.warn("Can't (yet) decode flowset id #{record.flowset_id} from observation domain id #{flowset.observation_domain_id}, because no template to decode it with has been received. This message will usually go away after 1 minute.")
+            $log.warn "Can't (yet) decode flowset id #{record.flowset_id} from observation domain id #{flowset.observation_domain_id}, because no template to decode it with has been received. This message will usually go away after 1 minute."
             return events
           end
 
@@ -518,12 +519,12 @@ module Fluent
             events << LogStash::Event.new(event)
           end
         else
-          @logger.warn("Unsupported flowset id #{record.flowset_id}")
+          $log.warn "Unsupported flowset id #{record.flowset_id}"
         end
 
         events
       rescue BinData::ValidityError => e
-        @logger.warn("Invalid IPFIX packet received (#{e})")
+        $log.warn "Invalid IPFIX packet received (#{e})"
       end
     end
   end
