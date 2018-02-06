@@ -1,7 +1,5 @@
 # Netflow plugin for Fluentd
 
-[![Build Status](https://travis-ci.org/repeatedly/fluent-plugin-netflow.svg)](https://travis-ci.org/repeatedly/fluent-plugin-netflow)
-
 
 ## Overview
 
