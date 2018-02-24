@@ -16,7 +16,7 @@ module Fluent
       config_param :cache_ttl, :integer, default: 4000
       config_param :versions, :array, default: [5, 9]
       config_param :definitions, :string, default: nil
-      config_param :target, :validate => :string, :default => "netflow"
+      config_param :target, :string, default:"netflow"
       IPFIX_FIELDS = ['version']  
 
       # Cisco NetFlow Export Datagram Format
