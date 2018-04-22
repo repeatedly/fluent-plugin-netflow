@@ -133,8 +133,8 @@ module Fluent
             uint16 :field_type
             uint16 :field_length
           end
-        end
-        skip   length: lambda { templates.length.odd? ? 2 : 0 }
+          skip   length: lambda { flowset_length - 10 - templates[0][:scope_length] - templates[0][:option_length] }
+        end        
       end
 
       class Netflow9PDU < BinData::Record
