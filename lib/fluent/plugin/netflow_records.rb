@@ -133,6 +133,7 @@ module Fluent
             uint16 :field_type
             uint16 :field_length
           end
+          # 10 is byte length of fields. flowset_id, floset_length, template_id, option_scope_length, option_length
           skip   length: lambda { flowset_length - 10 - templates[0][:scope_length] - templates[0][:option_length] }
         end        
       end
