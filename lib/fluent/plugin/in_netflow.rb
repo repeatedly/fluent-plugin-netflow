@@ -17,7 +17,7 @@
 #
 
 require 'fluent/plugin/input'
-require './parser_netflow'
+require 'fluent/plugin/parser_netflow'
 
 module Fluent::Plugin
   class NetflowInput < Input
