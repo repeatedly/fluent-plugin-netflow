@@ -68,7 +68,7 @@ module Fluent::Plugin
         end
 
         record['host'] = host
-        router.emit(@tag, time, record)
+        router.emit(@tag, Integer(time), record)
       }
     rescue => e
       log.warn "unexpected error on parsing", data: data.dump, error_class: e.class, error: e.message
