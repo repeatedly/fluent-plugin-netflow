@@ -38,6 +38,10 @@ module Fluent::Plugin
     end
     config_param :max_bytes, :integer, default: 2048
 
+    def multi_workers_ready?
+      true
+    end
+
     def configure(conf)
       super
 
