@@ -40,7 +40,12 @@ module Fluent
         if @definitions
           raise Fluent::ConfigError, "definitions file #{@definitions} doesn't exist" unless File.exist?(@definitions)
           begin
-            @template_fields['option'].merge!(YAML.load_file(@definitions))
+            template_fields_custom = YAML.load_file(@definitions)
+            @template_fields.each do |key, _|
+                if template_fields_custom.key?(key)
+                    @template_fields[key].merge!(template_fields_custom[key])
+                end
+            end
           rescue => e
             raise Fluent::ConfigError, "Bad syntax in definitions file #{@definitions}, error_class = #{e.class.name}, error = #{e.message}"
           end
