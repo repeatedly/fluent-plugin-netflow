@@ -65,10 +65,13 @@ When set to true, the plugin stores system uptime for ```first_switched``` and `
 
 YAML file containing Netflow field definitions to overfide pre-defined templates. Example is like below
 
-    ---
-    4:          # field value
-    - :uint8    # field length
-    - :protocol # field type
+```yaml
+---
+option:
+  4:          # field value
+  - :uint8    # field length
+  - :protocol # field type
+```
 
 
 ## Performance Evaluation
